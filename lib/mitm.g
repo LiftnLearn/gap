@@ -3,8 +3,23 @@
 
 BIND_GLOBAL( "MitM_DeclareConstructor",
   function( name, inputFilters, outputFilter )
-  DeclareOperation(name, inputFilters); 
-end );
+    DeclareOperation(name, inputFilters); 
+  end );
+
+BIND_GLOBAL( "MitM_InstallMethod",
+  function( arg... )
+     local list;
+     list := arg{[1..(Length(arg)-1)]};
+     Append(list,
+     [(function(local_arg...)
+      local G;
+      CallFuncList(arg[(Length(arg))], (local_arg));
+      #store arg somewhere as attribute of G
+      #DeclareAttribute
+      return G;
+     end)]);
+     CallFuncList(InstallMethod, list);
+  end );
 
 MitM_DeclareConstructor( "MitM_GroupWithGenerators",
     [IsCollection],
@@ -16,26 +31,22 @@ MitM_DeclareConstructor( "MitM_GroupWithGenerators",
     IsGroup and IsAttributeStoringRep and
     HasGeneratorsOfMagmaWithInverses and HasOne);
 
-InstallMethod( MitM_GroupWithGenerators,
+MitM_InstallMethod( MitM_GroupWithGenerators,
     [IsCollection],
     function( arg... )
-      local G;
-      G := GroupWithGenerators( arg );
-      #store arg somewhere as attribute of G
-      #DeclareAttribute
-      return G;
+      return CallFuncList( GroupWithGenerators, arg );
     end);
 
-InstallMethod( MitM_GroupWithGenerators,
+MitM_InstallMethod( MitM_GroupWithGenerators,
     [IsCollection, IsMultiplicativeElementWithInverse],
     function( arg... )
-      return GroupWithGenerators( arg );
+      return CallFuncList( GroupWithGenerators, arg );
     end);
 
-InstallMethod( MitM_GroupWithGenerators,
+MitM_InstallMethod( MitM_GroupWithGenerators,
     [ IsList and IsEmpty, IsMultiplicativeElementWithInverse ],
     function( arg... )
-      return GroupWithGenerators( arg );
+      return CallFuncList( GroupWithGenerators, arg );
     end);
 
 #This one has more specific output filters,
