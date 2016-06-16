@@ -1,0 +1,2 @@
+- 3rd GroupWithGenerators function doesn't seem to imply that
+  "IsCollection"-filter in Declaration is fulfilled
