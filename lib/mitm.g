@@ -23,8 +23,8 @@ BIND_GLOBAL( "MitM_InstallMethod",
       local G;
       G:= CallFuncList(arg[(Length(arg))], (local_arg));
 
-      SetMitM_ConstructorName(G, "constructorName");
-      SetMitM_ConstructorArgs(G, "constructorArgs");
+      SetMitM_ConstructorName(G, NameFunction(arg[1]));
+      SetMitM_ConstructorArgs(G, arg);
 
       return G;
     end)]);
@@ -70,15 +70,22 @@ MitM_InstallMethod( MitM_GroupWithGenerators,
 #    HasGeneratorsOfMagmaWithInverses and
 #    IsFinitelyGeneratedGroup and HasOne); 
 
-#MitM_DeclareGlobalFunction( "MitM_SubgroupByProperty" );
-#
-#InstallMethod( MitM_DeclareConstructor,
-#    "MitM_SubgroupByProperty",
-#    [],
-#    IsMagmaWithInverses and IsAttributeStoringRep 
-#    and HasElementTestFunction);
-#
-#InstallMethod( MitM_DeclareConstructor,
-#    "MitM_SubgroupShell",
-#    [],
-#    IsMagmaWithInverses and IsAttributeStoringRep);
+MitM_DeclareConstructor( "MitM_SubgroupByProperty", [],
+    IsMagmaWithInverses and IsAttributeStoringRep 
+    and HasElementTestFunction);
+
+MitM_InstallMethod( MitM_SubgroupByProperty,
+    [],
+    function( arg... )
+      return CallFuncList(SubgroupByProperty, arg);
+    end
+);
+
+MitM_DeclareConstructor( "MitM_SubgroupShell", [],
+    IsMagmaWithInverses and IsAttributeStoringRep);
+
+MitM_InstallMethod( MitM_SubgroupShell, [],
+    function( arg... )
+      return CallFuncList(SubgroupByProperty, arg);
+    end
+);
