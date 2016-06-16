@@ -6,6 +6,21 @@
 DeclareAttribute("MitM_ConstructorName", IsObject);
 DeclareAttribute("MitM_ConstructorArgs", IsObject);
 
+DeclareOperation("MitM_OM", [IsObject]);
+
+LoadPackage("Openmath");
+
+InstallMethod(MitM_OM, [IsGroup],
+    function(group)
+        Print("<OMOBJ>\n\t<OMA>\n\t\t<OMS cd='prog1' name='function_call'/>\n\t\t<OMV name='");
+        PrintObj(MitM_ConstructorName(group));
+        Print("'/>\n\t</OMA>\n");
+        Print("\t<OMA>\n\t\t<OMS cd='prog1' name='call_arguments'/>");
+        OMPrint(MitM_ConstructorArgs(group)[1]);
+        Print("</OMA>\n</OMOBJ>");
+    end
+);
+
 BIND_GLOBAL( "MitM_DeclareConstructor",
   function( name, inputFilters, outputFilter )
     DeclareOperation(name, inputFilters); 
@@ -24,7 +39,7 @@ BIND_GLOBAL( "MitM_InstallMethod",
       G:= CallFuncList(arg[(Length(arg))], (local_arg));
 
       SetMitM_ConstructorName(G, NameFunction(arg[1]));
-      SetMitM_ConstructorArgs(G, arg);
+      SetMitM_ConstructorArgs(G, local_arg);
 
       return G;
     end)]);
