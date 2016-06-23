@@ -54,7 +54,6 @@
 
 #include        "vars.h"                /* variables                       */
 
-FILE* xml = NULL;
 
 
 /****************************************************************************
@@ -1082,6 +1081,8 @@ CVar CompFunccall0to6Args (
     Int                 narg;           /* number of arguments             */
     Int                 i;              /* loop variable                   */
 
+    Emit("CompFunccall0to6Args");
+
     /* special case to inline 'Length'                                     */
     if ( CompFastListFuncs
       && TNUM_EXPR( FUNC_CALL(expr) ) == T_REF_GVAR
@@ -1156,6 +1157,7 @@ CVar CompFunccallXArgs (
     UInt                narg;           /* number of arguments             */
     UInt                i;              /* loop variable                   */
 
+    Emit("CompFunccallXArgs");
     /* allocate a temporary for the result                                 */
     result = CVAR_TEMP( NewTemp( "result" ) );
 
@@ -1198,11 +1200,12 @@ CVar CompFunccallXArgs (
 
 /****************************************************************************
 **
-*F  CompFunccallXArgs( <expr> ) . . . . . . . . . . . . . .  T_FUNCCALL_OPTS
+*F  CompFunccallOpts( <expr> ) . . . . . . . . . . . . . .  T_FUNCCALL_OPTS
 */
 CVar CompFunccallOpts(
                       Expr expr)
 {
+  Emit("CompFunccallOpts");
   CVar opts = CompExpr(ADDR_STAT(expr)[0]);
   GVar pushOptions;
   GVar popOptions;
@@ -1218,6 +1221,8 @@ CVar CompFunccallOpts(
   return result;
 }
      
+void CompFunc (
+    Obj                 func );
 
 /****************************************************************************
 **
@@ -1237,6 +1242,8 @@ CVar CompFuncExpr (
     fexs = FEXS_FUNC( CURR_FUNC );
     fexp = ELM_PLIST( fexs, ((Int*)ADDR_EXPR(expr))[0] );
     nr   = NR_INFO( INFO_FEXP( fexp ) );
+
+    CompFunc( fexp );
 
     /* allocate a new temporary for the function                           */
     func = CVAR_TEMP( NewTemp( "func" ) );
@@ -3212,7 +3219,6 @@ CVar CompIsbLVar (
     else {
         val = CVAR_LVAR(lvar);
     }
-    Emit("hello");
 
     /* emit the code to check that the variable has a value                */
     //Emit( "%c = ((%c != 0) ? True : False);\n", isb, val );
@@ -4039,6 +4045,7 @@ void CompStat (
 void CompUnknownStat (
     Stat                stat )
 {
+    printf("ERROR: unknownStat\n");
     //Emit( "CANNOT COMPILE STATEMENT OF TNUM %d;\n", TNUM_STAT(stat) );
 }
 
@@ -4094,7 +4101,7 @@ void CompProccall0to6Args (
     }
     else {
         func = CompExpr( FUNC_CALL(stat) );
-        CompCheckFunc( func );
+        //CompCheckFunc( func );
     }
 
     Emit(", 'args':[");
@@ -4188,6 +4195,7 @@ void CompProccallXArgs (
 void CompProccallOpts(
                       Stat stat)
 {
+  Emit("<!-- in CompProccallOpts !-->");
   CVar opts = CompExpr(ADDR_STAT(stat)[0]);
   GVar pushOptions;
   GVar popOptions;
@@ -4269,7 +4277,7 @@ void CompIf (
 
     /* emit the rest code                                                  */
     
-    Emit( " " );
+    Emit( ", " );
 
     /* loop over the 'elif' branches                                       */
     for ( i = 2; i <= nr; i++ ) {
@@ -4761,17 +4769,7 @@ void CompReturnObj (
 void CompReturnVoid (
     Stat                stat )
 {
-    /* print a comment                                                     */
-    if( CompPass == 2 ) {
-    Emit( "'return':'" ); PrintStat( stat ); Emit( "' " );
-    }
-
-    /* emit code to remove stack frame                                     */
-    //Emit( "RES_BRK_CURR_STAT();\n");
-    //Emit( "SWITCH_TO_OLD_FRAME(oldFrame);\n" );
-
-    /* emit code to return from function                                   */
-    //Emit( "return 0;\n" );
+    Emit("{ 'type':'return', 'void':'true'}");
 }
 
 
@@ -5627,25 +5625,16 @@ void CompInfo (
     Int                 narg;
     Int                 i;
 
-    //Emit( "\n/* Info( ... ); */\n" );
     sel = CompExpr( ARGI_INFO( stat, 1 ) );
     lev = CompExpr( ARGI_INFO( stat, 2 ) );
     lst = CVAR_TEMP( NewTemp( "lst" ) );
     tmp = CVAR_TEMP( NewTemp( "tmp" ) );
-    //Emit( "%c = CALL_2ARGS( InfoDecision, %c, %c );\n", tmp, sel, lev );
-    //Emit( "if ( %c == True ) {\n", tmp );
     if ( IS_TEMP_CVAR( tmp ) )  FreeTemp( TEMP_CVAR( tmp ) );
     narg = NARG_SIZE_INFO(SIZE_STAT(stat))-2;
-    //Emit( "%c = NEW_PLIST( T_PLIST, %d );\n", lst, narg );
-    //Emit( "SET_LEN_PLIST( %c, %d );\n", lst, narg );
     for ( i = 1;  i <= narg;  i++ ) {
         tmp = CompExpr( ARGI_INFO( stat, i+2 ) );
-        //Emit( "SET_ELM_PLIST( %c, %d, %c );\n", lst, i, tmp );
-        //Emit( "CHANGED_BAG(%c);\n", lst );
         if ( IS_TEMP_CVAR( tmp ) )  FreeTemp( TEMP_CVAR( tmp ) );
     }
-    //Emit( "CALL_1ARGS( InfoDoPrint, %c );\n", lst );
-    //Emit( "}\n" );
 
     /* free the temporaries                                                */
     if ( IS_TEMP_CVAR( lst ) )  FreeTemp( TEMP_CVAR( lst ) );
@@ -5664,16 +5653,9 @@ void CompAssert2 (
     CVar                lev;            /* the level                       */
     CVar                cnd;            /* the condition                   */
 
-    //Emit( "\n/* Assert( ... ); */\n" );
     lev = CompExpr( ADDR_STAT(stat)[0] );
-    //Emit( "if ( ! LT(CurrentAssertionLevel, %c) ) {\n", lev );
     cnd = CompBoolExpr( ADDR_STAT(stat)[1] );
-    //Emit( "if ( ! %c ) {\n", cnd );
-    //Emit( "ErrorReturnVoid(\"Assertion failure\",0L,0L,\"you may 'return;'\"" );
-    //Emit( ");\n");
-    //Emit( "}\n" );
-    //Emit( "}\n" );
-
+    
     /* free the temporaries                                                */
     if ( IS_TEMP_CVAR( cnd ) )  FreeTemp( TEMP_CVAR( cnd ) );
     if ( IS_TEMP_CVAR( lev ) )  FreeTemp( TEMP_CVAR( lev ) );
@@ -5743,9 +5725,10 @@ void CompFunc (
     narg = (NARG_FUNC(func) != -1 ? NARG_FUNC(func) : 1);
     nloc = NLOC_FUNC(func);
 
+    Emit("{ \"type\":\"function\" ");
+ 
     /* in the first pass allocate the info bag                             */
     if ( CompPass == 1 ) {
-
         CompFunctionsNr++;
         GROW_PLIST(    CompFunctions, CompFunctionsNr );
         SET_ELM_PLIST( CompFunctions, CompFunctionsNr, func );
@@ -5762,7 +5745,6 @@ void CompFunc (
 
         INFO_FEXP(func) = info;
         CHANGED_BAG(func);
-
     }
 
     /* switch to this function (so that 'ADDR_STAT' and 'ADDR_EXPR' work)  */
@@ -5771,92 +5753,6 @@ void CompFunc (
     /* get the info bag                                                    */
     info = INFO_FEXP( CURR_FUNC );
 
-    /* compile the inner functions                                        */
-    fexs = FEXS_FUNC(func);
-    for ( i = 1;  i <= LEN_PLIST(fexs);  i++ ) {
-        CompFunc( ELM_PLIST( fexs, i ) );
-    }
-
-    /* emit the code for the function header and the arguments             */
-    //Emit( "\n/* handler for function %d */\n", NR_INFO(info));
-    if ( narg == 0 ) {
-        //Emit( "static Obj  HdlrFunc%d (\n", NR_INFO(info) );
-        //Emit( " Obj  self )\n" );
-        //Emit( "{\n" );
-    }
-    else if ( narg <= 6 ) {
-        //Emit( "static Obj  HdlrFunc%d (\n", NR_INFO(info) );
-        //Emit( " Obj  self,\n" );
-        for ( i = 1; i < narg; i++ ) {
-            //Emit( " Obj  %c,\n", CVAR_LVAR(i) );
-        }
-        //Emit( " Obj  %c )\n", CVAR_LVAR(narg) );
-        //Emit( "{\n" );
-    }
-    else {
-        //Emit( "static Obj  HdlrFunc%d (\n", NR_INFO(info) );
-        //Emit( " Obj  self,\n" );
-        //Emit( " Obj  args )\n" );
-        //Emit( "{\n" );
-        for ( i = 1; i <= narg; i++ ) {
-            //Emit( "Obj  %c;\n", CVAR_LVAR(i) );
-        }
-    }
-
-    /* emit the code for the local variables                               */
-    for ( i = 1; i <= nloc; i++ ) {
-        if ( ! CompGetUseHVar( i+narg ) ) {
-            //Emit( "Obj %c = 0;\n", CVAR_LVAR(i+narg) );
-        }
-    }
-
-    /* emit the code for the temporaries                                   */
-    for ( i = 1; i <= NTEMP_INFO(info); i++ ) {
-        //Emit( "Obj %c = 0;\n", CVAR_TEMP(i) );
-    }
-    for ( i = 1; i <= NLOOP_INFO(info); i++ ) {
-        //Emit( "Int l_%d = 0;\n", i );
-    }
-
-    /* emit the code for the higher variables                              */
-    //Emit( "Bag oldFrame;\n" );
-    //Emit( "OLD_BRK_CURR_STAT\n");
-
-    /* emit the code to get the arguments for xarg functions               */
-    if ( 6 < narg ) {
-        //Emit( "CHECK_NR_ARGS( %d, args )\n", narg );
-        for ( i = 1; i <= narg; i++ ) {
-            //Emit( "%c = ELM_PLIST( args, %d );\n", CVAR_LVAR(i), i );
-        }
-    }
-
-    /* emit the code to switch to a new frame for outer functions          */
-#if 1
-    /* Try and get better debugging by always doing this */
-    if (1) {
-#else
-      /* this was the old code */
-    if ( NHVAR_INFO(info) != 0 ) {
-#endif
-        //Emit( "\n/* allocate new stack frame */\n" );
-        //Emit( "SWITCH_TO_NEW_FRAME(self,%d,0,oldFrame);\n",NHVAR_INFO(info));
-        for ( i = 1; i <= narg; i++ ) {
-            if ( CompGetUseHVar( i ) ) {
-                //Emit( "ASS_LVAR( %d, %c );\n",GetIndxHVar(i),CVAR_LVAR(i));
-            }
-        }
-    }
-    else {
-        //Emit( "\n/* restoring old stack frame */\n" );
-        //Emit( "oldFrame = TLS(CurrLVars);\n" );
-        //Emit( "SWITCH_TO_OLD_FRAME(ENVI_FUNC(self));\n" );
-    }
-
-    /* emit the code to save and zero the "current statement" information
-     so that the break loop behaves */
-    //Emit( "REM_BRK_CURR_STAT();\n");
-    //Emit( "SET_BRK_CURR_STAT(0);\n");
-    
     /* we know all the arguments have values                               */
     for ( i = 1; i <= narg; i++ ) {
         SetInfoCVar( CVAR_LVAR(i), W_BOUND );
@@ -5868,15 +5764,17 @@ void CompFunc (
     /* compile the body                                                    */
     CompStat( FIRST_STAT_CURR_FUNC );
 
-    /* emit the code to switch back to the old frame and return            */
-    //Emit( "\n/* return; */\n" );
-    //Emit( "RES_BRK_CURR_STAT();\n" );
-    //Emit( "SWITCH_TO_OLD_FRAME(oldFrame);\n" );
-    //Emit( "return 0;\n" );
-    //Emit( "}\n" );
+    /* compile the inner functions                                        */
+    //fexs = FEXS_FUNC(func);
+    //for ( i = 1;  i <= LEN_PLIST(fexs);  i++ ) {
+    //    CompFunc( ELM_PLIST( fexs, i ) );
+    //}
 
     /* switch back to old frame                                            */
     SWITCH_TO_OLD_LVARS( oldFrame );
+  
+    Emit("}");
+
 }
 
 
@@ -5902,9 +5800,6 @@ Int CompileFunc (
     col = SyNrCols;
     SyNrCols = 255;
 
-    /* store the magic values                                              */
-    compilerMagic1 = magic1;
-    compilerMagic2 = magic2;
 
     /* create 'CompInfoGVar' and 'CompInfoRNam'                            */
     CompInfoGVar = NewBag( T_STRING, sizeof(UInt) * 1024 );
@@ -5919,224 +5814,17 @@ Int CompileFunc (
     CompPass = 1;
     CompFunc( func );
 
-
     /* ok, lets emit some code now                                         */
     CompPass = 2;
 
 /********** create a JSON structure **********/
 
-
-    printf("hwhat\n");
-    fflush(stdout);
-
-    Emit("{'type':'function', 'name':'main', 'body':");
-
-//    for ( i = 1; i <= CompFunctionsNr; i++ ) {
-//      printf("%lld\n", CompFunctionsNr);
-//      fprintf(xml, "%s", HDLR_FUNC(func,i));
-//    }
-//    
-//    for ( i = 1; i < SIZE_OBJ(CompInfoGVar)/sizeof(UInt); i++ ) {
-//        if ( CompGetUseGVar( i ) ) {
-//            fprintf(xml, "G_%n = GVarName( \"%s\" );\n",
-//                   NameGVar(i), NameGVar(i) );
-//        }
-//    }
-
-    
-
-
-
-    /********** end creation of XML tree ********/
-
-
-    /* emit code to include the interface files                            */
-    //Emit( "/* C file produced by GAC */\n" );
-    //Emit( "#include \"compiled.h\"\n" );
-
-    /* emit code for global variables                                      */
-    //Emit( "\n/* global variables used in handlers */\n" );
-    for ( i = 1; i < SIZE_OBJ(CompInfoGVar)/sizeof(UInt); i++ ) {
-        if ( CompGetUseGVar( i ) ) {
-            //Emit( "static GVar G_%n;\n", NameGVar(i) );
-        }
-        if ( CompGetUseGVar( i ) & COMP_USE_GVAR_COPY ) {
-            //Emit( "static Obj  GC_%n;\n", NameGVar(i) );
-        }
-        if ( CompGetUseGVar( i ) & COMP_USE_GVAR_FOPY ) {
-            //Emit( "static Obj  GF_%n;\n", NameGVar(i) );
-        }
-    }
-
-    /* emit code for record names                                          */
-    //Emit( "\n/* record names used in handlers */\n" );
-    for ( i = 1; i < SIZE_OBJ(CompInfoRNam)/sizeof(UInt); i++ ) {
-        if ( CompGetUseRNam( i ) ) {
-            //Emit( "static RNam R_%n;\n", NAME_RNAM(i) );
-        }
-    }
-
-    /* emit code for the functions                                         */
-    //Emit( "\n/* information for the functions */\n" );
-    //Emit( "static Obj  NameFunc[%d];\n", CompFunctionsNr+1 );
-    //Emit( "static Obj  NamsFunc[%d];\n", CompFunctionsNr+1 );
-    //Emit( "static Int  NargFunc[%d];\n", CompFunctionsNr+1 );
-    //Emit( "static Obj  DefaultName;\n" );
-    //Emit( "static Obj FileName;\n" );
-
-
     /* now compile the handlers                                            */
     CompFunc( func );
-
-    /* emit the code for the function that links this module to GAP        */
-    //Emit( "\n/* 'InitKernel' sets up data structures, fopies, copies, handlers */\n" );
-    //Emit( "static Int InitKernel ( StructInitInfo * module )\n" );
-    //Emit( "{\n" );
-    //Emit( "\n/* global variables used in handlers */\n" );
-    for ( i = 1; i < SIZE_OBJ(CompInfoGVar)/sizeof(UInt); i++ ) {
-        if ( CompGetUseGVar( i ) & COMP_USE_GVAR_COPY ) {
-            //Emit( "InitCopyGVar( \"%s\", &GC_%n );\n",
-            //      NameGVar(i), NameGVar(i) );
-        }
-        if ( CompGetUseGVar( i ) & COMP_USE_GVAR_FOPY ) {
-            //Emit( "InitFopyGVar( \"%s\", &GF_%n );\n",
-            //      NameGVar(i), NameGVar(i) );
-        }
-    }
-    //Emit( "\n/* information for the functions */\n" );
-    //Emit( "InitGlobalBag( &DefaultName, \"%s:DefaultName(%d)\" );\n",
-    //      magic2, magic1 );
-    //Emit( "InitGlobalBag( &FileName, \"%s:FileName(%d)\" );\n",
-    //      magic2, magic1 );
-    for ( i = 1; i <= CompFunctionsNr; i++ ) {
-        //Emit( "InitHandlerFunc( HdlrFunc%d, \"%s:HdlrFunc%d(%d)\" );\n",
-        //      i, compilerMagic2, i, compilerMagic1 );
-        //Emit( "InitGlobalBag( &(NameFunc[%d]), \"%s:NameFunc[%d](%d)\" );\n", 
-        //       i, magic2, i, magic1 );
-        n = NAME_FUNC(ELM_PLIST(CompFunctions,i));
-        if ( n != 0 && IsStringConv(n) ) {
-            //Emit( "InitGlobalBag( &(NamsFunc[%d]), \"%s:NamsFunc[%d](%d)\" );\n",
-            //      i, magic2, i, magic1 );
-        }
-    }
-    //Emit( "\n/* return success */\n" );
-    //Emit( "return 0;\n" );
-    //Emit( "\n}\n" );
-
-    //Emit( "\n/* 'InitLibrary' sets up gvars, rnams, functions */\n" );
-    //Emit( "static Int InitLibrary ( StructInitInfo * module )\n" );
-    //Emit( "{\n" );
-    //Emit( "Obj func1;\n" );
-    //Emit( "Obj body1;\n" );
-    //Emit( "\n/* Complete Copy/Fopy registration */\n" );
-    //Emit( "UpdateCopyFopyInfo();\n" );
-    //Emit( "\n/* global variables used in handlers */\n" );
-    for ( i = 1; i < SIZE_OBJ(CompInfoGVar)/sizeof(UInt); i++ ) {
-        if ( CompGetUseGVar( i ) ) {
-            //Emit( "G_%n = GVarName( \"%s\" );\n",
-            //       NameGVar(i), NameGVar(i) );
-        }
-    }
-    //Emit( "\n/* record names used in handlers */\n" );
-    for ( i = 1; i < SIZE_OBJ(CompInfoRNam)/sizeof(UInt); i++ ) {
-        if ( CompGetUseRNam( i ) ) {
-            //Emit( "R_%n = RNamName( \"%s\" );\n",
-            //      NAME_RNAM(i), NAME_RNAM(i) );
-        }
-    }
-    //Emit( "\n/* information for the functions */\n" );
-    //Emit( "C_NEW_STRING( DefaultName, 14, \"local function\" );\n" );
-    //Emit( "C_NEW_STRING( FileName, %d, \"%s\" );\n", strlen(magic2), magic2 );
-    for ( i = 1; i <= CompFunctionsNr; i++ ) {
-        n = NAME_FUNC(ELM_PLIST(CompFunctions,i));
-        if ( n != 0 && IsStringConv(n) ) {
-            //Emit( "C_NEW_STRING( NameFunc[%d], %d, \"%S\" );\n",
-            //      i, strlen(CSTR_STRING(n)), CSTR_STRING(n) );
-        }
-        else {
-            //Emit( "NameFunc[%d] = DefaultName;\n", i );
-        }
-        //Emit( "NamsFunc[%d] = 0;\n", i );
-        //Emit( "NargFunc[%d] = %d;\n", i, NARG_FUNC(ELM_PLIST(CompFunctions,i)));
-    }
-    //Emit( "\n/* create all the functions defined in this module */\n" );
-    //Emit( "func1 = NewFunction(NameFunc[1],NargFunc[1],NamsFunc[1],HdlrFunc1);\n" );
-    //Emit( "ENVI_FUNC( func1 ) = TLS(CurrLVars);\n" );
-    //Emit( "CHANGED_BAG( TLS(CurrLVars) );\n" );
-    //Emit( "body1 = NewBag( T_BODY, NUMBER_HEADER_ITEMS_BODY*sizeof(Obj));\n" );
-    //Emit( "BODY_FUNC( func1 ) = body1;\n" );
-    //Emit( "CHANGED_BAG( func1 );\n");
-    //Emit( "CALL_0ARGS( func1 );\n" );
-    //Emit( "\n/* return success */\n" );
-    //Emit( "return 0;\n" );
-    //Emit( "\n}\n" );
-
-    //Emit( "\n/* 'PostRestore' restore gvars, rnams, functions */\n" );
-    //Emit( "static Int PostRestore ( StructInitInfo * module )\n" );
-    //Emit( "{\n" );
-    //Emit( "\n/* global variables used in handlers */\n" );
-    for ( i = 1; i < SIZE_OBJ(CompInfoGVar)/sizeof(UInt); i++ ) {
-        if ( CompGetUseGVar( i ) ) {
-            //Emit( "G_%n = GVarName( \"%s\" );\n",
-            //       NameGVar(i), NameGVar(i) );
-        }
-    }
-    //Emit( "\n/* record names used in handlers */\n" );
-    for ( i = 1; i < SIZE_OBJ(CompInfoRNam)/sizeof(UInt); i++ ) {
-        if ( CompGetUseRNam( i ) ) {
-            //Emit( "R_%n = RNamName( \"%s\" );\n",
-            //      NAME_RNAM(i), NAME_RNAM(i) );
-        }
-    }
-    //Emit( "\n/* information for the functions */\n" );
-    for ( i = 1; i <= CompFunctionsNr; i++ ) {
-        n = NAME_FUNC(ELM_PLIST(CompFunctions,i));
-        if ( n == 0 || ! IsStringConv(n) ) {
-            //Emit( "NameFunc[%d] = DefaultName;\n", i );
-        }
-        //Emit( "NamsFunc[%d] = 0;\n", i );
-        //Emit( "NargFunc[%d] = %d;\n", i, NARG_FUNC(ELM_PLIST(CompFunctions,i)));
-    }
-    //Emit( "\n/* return success */\n" );
-    //Emit( "return 0;\n" );
-    //Emit( "\n}\n" );
-    //Emit( "\n" );
-
-    /* emit the initialization code                                        */
-    //Emit( "\n/* <name> returns the description of this module */\n" );
-    //Emit( "static StructInitInfo module = {\n" );
-    if ( ! strcmp( "Init_Dynamic", name ) ) {
-        //Emit( "/* type        = */ %d,\n",     MODULE_DYNAMIC ); 
-    }
-    else {
-        //Emit( "/* type        = */ %d,\n",     MODULE_STATIC ); 
-    }
-    //Emit( "/* name        = */ \"%C\",\n", magic2 );
-    //Emit( "/* revision_c  = */ %d,\n",     0 );
-    //Emit( "/* revision_h  = */ %d,\n",     0 );
-    //Emit( "/* version     = */ %d,\n",     0 );
-    //Emit( "/* crc         = */ %d,\n",     magic1 );
-    //Emit( "/* initKernel  = */ InitKernel,\n" );
-    //Emit( "/* initLibrary = */ InitLibrary,\n" );
-    //Emit( "/* checkInit   = */ 0,\n" );
-    //Emit( "/* preSave     = */ 0,\n" );
-    //Emit( "/* postSave    = */ 0,\n" );
-    //Emit( "/* postRestore = */ PostRestore\n" );
-    //Emit( "};\n" );
-    //Emit( "\n" );
-    //Emit( "StructInitInfo * %n ( void )\n", name );
-    //Emit( "{\n" );
-    //Emit( "return &module;\n" );
-    //Emit( "}\n" );
-    //Emit( "\n/* compiled code ends here */\n" );
-
-    Emit("}");
 
     /* close the output file                                               */
     SyNrCols = col;
     CloseOutput();
-
-    fclose(xml);
 
     /* return success                                                      */
     return CompFunctionsNr;
@@ -6169,52 +5857,6 @@ Obj FuncCOMPILE_FUNC (
     output = ELM_LIST( arg, 1 );
     func   = ELM_LIST( arg, 2 );
     name   = ELM_LIST( arg, 3 );
-    magic1 = ELM_LIST( arg, 4 );
-    magic2 = ELM_LIST( arg, 5 );
-
-    /* check the arguments                                                 */
-    if ( ! IsStringConv( output ) ) {
-        ErrorQuit("CompileFunc: <output> must be a string",0L,0L);
-    }
-    if ( TNUM_OBJ(func) != T_FUNCTION ) {
-        ErrorQuit("CompileFunc: <func> must be a function",0L,0L);
-    }
-    if ( ! IsStringConv( name ) ) {
-        ErrorQuit("CompileFunc: <name> must be a string",0L,0L);
-    }
-    if ( ! IS_INTOBJ(magic1) ) {
-        ErrorQuit("CompileFunc: <magic1> must be an integer",0L,0L);
-    }
-    if ( ! IsStringConv(magic2) ) {
-        ErrorQuit("CompileFunc: <magic2> must be a string",0L,0L);
-    }
-
-    /* possible optimiser flags                                            */
-    CompFastIntArith        = 1;
-    CompFastPlainLists      = 1;
-    CompFastListFuncs       = 1;
-    CompCheckTypes          = 1;
-    CompCheckListElements   = 1;
-    CompCheckPosObjElements = 0;
-
-    if ( 6 <= len ) {
-        CompFastIntArith        = EQ( ELM_LIST( arg,  6 ), True );
-    }
-    if ( 7 <= len ) {
-        CompFastPlainLists      = EQ( ELM_LIST( arg,  7 ), True );
-    }
-    if ( 8 <= len ) {
-        CompFastListFuncs       = EQ( ELM_LIST( arg,  8 ), True );
-    }
-    if ( 9 <= len ) {
-        CompCheckTypes          = EQ( ELM_LIST( arg,  9 ), True );
-    }
-    if ( 10 <= len ) {
-        CompCheckListElements   = EQ( ELM_LIST( arg, 10 ), True );
-    }
-    if ( 11 <= len ) {
-        CompCheckPosObjElements = EQ( ELM_LIST( arg, 11 ), True );
-    }
     
     /* compile the function                                                */
     nr = CompileFunc(
@@ -6542,6 +6184,4 @@ StructInitInfo * InitInfoCompiler ( void )
 
 *E  compiler.c  . . . . . . . . . . . . . . . . . . . . . . . . . . ends here
 */
-
-
 
