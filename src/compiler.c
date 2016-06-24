@@ -13,6 +13,7 @@
 */
 #include        <stdio.h>               /* Input/Output for debugging      */
 #include        <stdlib.h> 
+#include         <ctype.h>
 
 #include        <stdarg.h>              /* variable argument list macros   */
 #include        "system.h"              /* Ints, UInts                     */
@@ -54,6 +55,7 @@
 
 #include        "vars.h"                /* variables                       */
 
+FILE* json;
 
 
 /****************************************************************************
@@ -491,7 +493,7 @@ void            FreeTemp (
 
     /* check that deallocations happens in the correct order               */
     if ( temp != CTEMP_INFO( info ) && CompPass == 2 ) {
-        Pr("PROBLEM: freeing t_%d, should be t_%d\n",(Int)temp,CTEMP_INFO(info));
+        //Pr("PROBLEM: freeing t_%d, should be t_%d\n",(Int)temp,CTEMP_INFO(info));
     }
 
     /* free the temporary                                                  */
@@ -703,7 +705,7 @@ void            CompSetUseRNam (
     RNam                rnam,
     UInt                mode )
 {
-    Emit( "\"%n\"", NAME_RNAM(rnam) );
+    Emit( "\"%s\"", NAME_RNAM(rnam) );
 
     /* only mark in pass 1                                                 */
     if ( CompPass != 1 )  return;
@@ -766,126 +768,129 @@ void            Emit (
 
     /* loop over the format string                                         */
     va_start( ap, fmt );
-    for ( p = fmt; *p != '\0'; p++ ) {
 
-        /* print an indent, except for preprocessor commands               */
-        if ( *fmt != '#' ) {
-            if ( 0 < EmitIndent2 && *p == '}' ) EmitIndent2--;
-            while ( 0 < EmitIndent2-- )  Pr( " ", 0L, 0L );
-        }
+    vfprintf(json, fmt, ap);
 
-        /* format an argument                                              */
-        if ( *p == '%' ) {
-            p++;
+    //for ( p = fmt; *p != '\0'; p++ ) {
 
-            /* emit an integer                                             */
-            if ( *p == 'd' ) {
-                dint = va_arg( ap, Int );
-                Pr( "%d", dint, 0L );
-            }
+    //    /* print an indent, except for preprocessor commands               */
+    //    if ( *fmt != '#' ) {
+    //        if ( 0 < EmitIndent2 && *p == '}' ) EmitIndent2--;
+    //        while ( 0 < EmitIndent2-- )  Pr( " ", 0L, 0L );
+    //    }
 
-            /* emit a string                                               */
-            else if ( *p == 's' ) {
-                string = va_arg( ap, Char* );
-                Pr( "%s", (Int)string, 0L );
-            }
+    //    /* format an argument                                              */
+    //    if ( *p == '%' ) {
+    //        p++;
 
-            /* emit a string                                               */
-            else if ( *p == 'S' ) {
-                string = va_arg( ap, Char* );
-                Pr( "%S", (Int)string, 0L );
-            }
+    //        /* emit an integer                                             */
+    //        if ( *p == 'd' ) {
+    //            dint = va_arg( ap, Int );
+    //            Pr( "%d", dint, 0L );
+    //        }
 
-            /* emit a string                                               */
-            else if ( *p == 'C' ) {
-                string = va_arg( ap, Char* );
-                Pr( "%C", (Int)string, 0L );
-            }
+    //        /* emit a string                                               */
+    //        else if ( *p == 's' ) {
+    //            string = va_arg( ap, Char* );
+    //            Pr( "%s", (Int)string, 0L );
+    //        }
 
-            /* emit a name                                                 */
-            else if ( *p == 'n' ) {
-                string = va_arg( ap, Char* );
-                for ( q = string; *q != '\0'; q++ ) {
-                    if ( IsAlpha(*q) || IsDigit(*q) ) {
-                        Pr( "%c", (Int)(*q), 0L );
-                    }
-                    else if ( *q == '_' ) {
-                        Pr( "__", 0L, 0L );
-                    }
-                    else {
-                        Pr("_%c%c",hex[((UInt)*q)/16],hex[((UInt)*q)%16]);
-                    }
-                }
-            }
+    //        /* emit a string                                               */
+    //        else if ( *p == 'S' ) {
+    //            string = va_arg( ap, Char* );
+    //            Pr( "%S", (Int)string, 0L );
+    //        }
 
-            /* emit a C variable                                           */
-            else if ( *p == 'c' ) {
-                cvar = va_arg( ap, CVar );
-                if ( IS_INTG_CVAR(cvar) ) {
-		  Int x = INTG_CVAR(cvar);
-		  if (x >= -(1L <<28) && x < (1L << 28))
-                    Pr( "INTOBJ_INT(%d)", x, 0L );
-		  else
-		    Pr( "C_MAKE_MED_INT(%d)", x, 0L );
-                }
-                else if ( IS_TEMP_CVAR(cvar) ) {
-                    Pr( "t_%d", TEMP_CVAR(cvar), 0L );
-                }
-                else if ( LVAR_CVAR(cvar) <= narg ) {
-                    //Emit( "a_%n", NAME_LVAR( LVAR_CVAR(cvar) ) );
-                }
-                else {
-                    //Emit( "l_%n", NAME_LVAR( LVAR_CVAR(cvar) ) );
-                }
-            }
+    //        /* emit a string                                               */
+    //        else if ( *p == 'C' ) {
+    //            string = va_arg( ap, Char* );
+    //            Pr( "%C", (Int)string, 0L );
+    //        }
 
-            /* emit a C variable                                           */
-            else if ( *p == 'i' ) {
-                cvar = va_arg( ap, CVar );
-                if ( IS_INTG_CVAR(cvar) ) {
-                    Pr( "%d", INTG_CVAR(cvar), 0L );
-                }
-                else if ( IS_TEMP_CVAR(cvar) ) {
-                    Pr( "INT_INTOBJ(t_%d)", TEMP_CVAR(cvar), 0L );
-                }
-                else if ( LVAR_CVAR(cvar) <= narg ) {
-                    //Emit( "INT_INTOBJ(a_%n)", NAME_LVAR( LVAR_CVAR(cvar) ) );
-                }
-                else {
-                    //Emit( "INT_INTOBJ(l_%n)", NAME_LVAR( LVAR_CVAR(cvar) ) );
-                }
-            }
+    //        /* emit a name                                                 */
+    //        else if ( *p == 'n' ) {
+    //            string = va_arg( ap, Char* );
+    //            for ( q = string; *q != '\0'; q++ ) {
+    //                if ( IsAlpha(*q) || IsDigit(*q) ) {
+    //                    Pr( "%c", (Int)(*q), 0L );
+    //                }
+    //                else if ( *q == '_' ) {
+    //                    Pr( "__", 0L, 0L );
+    //                }
+    //                else {
+    //                    Pr("_%c%c",hex[((UInt)*q)/16],hex[((UInt)*q)%16]);
+    //                }
+    //            }
+    //        }
 
-            /* emit a '%'                                                  */
-            else if ( *p == '%' ) {
-                Pr( "%%", 0L, 0L );
-            }
+    //        /* emit a C variable                                           */
+    //        else if ( *p == 'c' ) {
+    //            cvar = va_arg( ap, CVar );
+    //            if ( IS_INTG_CVAR(cvar) ) {
+		//  Int x = INTG_CVAR(cvar);
+		//  if (x >= -(1L <<28) && x < (1L << 28))
+    //                Pr( "INTOBJ_INT(%d)", x, 0L );
+		//  else
+		//    Pr( "C_MAKE_MED_INT(%d)", x, 0L );
+    //            }
+    //            else if ( IS_TEMP_CVAR(cvar) ) {
+    //                Pr( "t_%d", TEMP_CVAR(cvar), 0L );
+    //            }
+    //            else if ( LVAR_CVAR(cvar) <= narg ) {
+    //                //Emit( "a_%n", NAME_LVAR( LVAR_CVAR(cvar) ) );
+    //            }
+    //            else {
+    //                //Emit( "l_%n", NAME_LVAR( LVAR_CVAR(cvar) ) );
+    //            }
+    //        }
 
-            /* what                                                        */
-            else {
-                Pr( "%%illegal format statement", 0L, 0L );
-            }
+    //        /* emit a C variable                                           */
+    //        else if ( *p == 'i' ) {
+    //            cvar = va_arg( ap, CVar );
+    //            if ( IS_INTG_CVAR(cvar) ) {
+    //                Pr( "%d", INTG_CVAR(cvar), 0L );
+    //            }
+    //            else if ( IS_TEMP_CVAR(cvar) ) {
+    //                Pr( "INT_INTOBJ(t_%d)", TEMP_CVAR(cvar), 0L );
+    //            }
+    //            else if ( LVAR_CVAR(cvar) <= narg ) {
+    //                //Emit( "INT_INTOBJ(a_%n)", NAME_LVAR( LVAR_CVAR(cvar) ) );
+    //            }
+    //            else {
+    //                //Emit( "INT_INTOBJ(l_%n)", NAME_LVAR( LVAR_CVAR(cvar) ) );
+    //            }
+    //        }
 
-        }
+    //        /* emit a '%'                                                  */
+    //        else if ( *p == '%' ) {
+    //            Pr( "%%", 0L, 0L );
+    //        }
 
-        else if ( *p == '{' ) {
-            Pr( "{", 0L, 0L );
-            EmitIndent++;
-        }
-        else if ( *p == '}' ) {
-            Pr( "}", 0L, 0L );
-            EmitIndent--;
-        }
-        else if ( *p == '\n' ) {
-            Pr( "\n", 0L, 0L );
-            EmitIndent2 = EmitIndent;
-        }
+    //        /* what                                                        */
+    //        else {
+    //            Pr( "%%illegal format statement", 0L, 0L );
+    //        }
 
-        else {
-            Pr( "%c", (Int)(*p), 0L );
-        }
+    //    }
 
-    }
+    //    else if ( *p == '{' ) {
+    //        Pr( "{", 0L, 0L );
+    //        EmitIndent++;
+    //    }
+    //    else if ( *p == '}' ) {
+    //        Pr( "}", 0L, 0L );
+    //        EmitIndent--;
+    //    }
+    //    else if ( *p == '\n' ) {
+    //        Pr( "\n", 0L, 0L );
+    //        EmitIndent2 = EmitIndent;
+    //    }
+
+    //    else {
+    //        Pr( "%c", (Int)(*p), 0L );
+    //    }
+
+    //}
     va_end( ap );
 
 }
@@ -1110,7 +1115,6 @@ CVar CompFunccall0to6Args (
     }
     else {
         func = CompExpr( FUNC_CALL(expr) );
-        CompCheckFunc( func );
     }
 
     Emit(", \"args\":[");
@@ -2182,13 +2186,13 @@ CVar CompSum (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'arithmetic', 'subtype':'sum', ");
-    Emit("'left':");
+    Emit("{\"type\":\"arithmetic\", \"subtype\":\"sum\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -2581,7 +2585,7 @@ CVar CompIntExpr (
         siz = SIZE_EXPR(expr) - sizeof(UInt);
 	typ = *(UInt *)ADDR_EXPR(expr);
 	//Emit( "%c = C_MAKE_INTEGER_BAG(%d, %d);\n",val, siz, typ);
-    Emit("%d", val);
+        Emit("%d", val);
         if ( typ == T_INTPOS ) {
             SetInfoCVar(val, W_INT_POS);
         }
@@ -2975,7 +2979,9 @@ CVar CompStringExpr (
     /* allocate a new temporary for the string                             */
     string = CVAR_TEMP( NewTemp( "string" ) );
 
-    Emit("'%C'", sizeof(UInt)+ (Char*)ADDR_EXPR(expr));
+    //TODO:
+    Emit("\"%s\"", (sizeof(UInt) + (Char*)ADDR_EXPR(expr)));
+//    Pr( "%C", (Int)(sizeof(UInt) + (Char*)ADDR_EXPR(expr)), 0L);
 
     /* create the string and copy the stuff                                */
     //Emit( "C_NEW_STRING( %c, %d, \"%C\" );\n",
@@ -3174,18 +3180,15 @@ CVar CompRefLVar (
     }
 
     /* emit the code to get the value                                      */
-    if ( CompGetUseHVar( lvar ) ) {
-        val = CVAR_TEMP( NewTemp( "val" ) );
-        //Emit( "%c = OBJ_LVAR( %d );\n", val, GetIndxHVar(lvar) );
-    }
-    else {
-        val = CVAR_LVAR(lvar);
-    }
+//    if ( CompGetUseHVar( lvar ) ) {
+//        val = CVAR_TEMP( NewTemp( "val" ) );
+//        //Emit( "%c = OBJ_LVAR( %d );\n", val, GetIndxHVar(lvar) );
+//    }
+//    else {
+//        val = CVAR_LVAR(lvar);
+//    }
 
-    Emit("%d", val);
-
-    /* emit code to check that the variable has a value                    */
-    CompCheckBound( val, NAME_LVAR(lvar) );
+    Emit("\"%s\"", NAME_LVAR(lvar));
 
     /* return the value                                                    */
     return val;
@@ -3315,7 +3318,7 @@ CVar CompRefGVar (
     /* allocate a new global variable for the value                        */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit( "'%n'", NameGVar(gvar));
+    Emit( "\"%s\"", NameGVar(gvar));
 
     /* emit the code to check that the variable has a value                */
     CompCheckBound( val, NameGVar(gvar) );
@@ -3342,8 +3345,9 @@ CVar CompRefGVarFopy (
     /* allocate a new temporary for the value                              */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
+    //TODO:
     /* emit name of the global variable                                    */
-    Emit( "'%n'", NameGVar(gvar) );
+    Emit("\"%s\"", NameGVar(gvar));
 
     /* we know that the object in a function copy is a function            */
     SetInfoCVar( val, W_FUNC );
@@ -4098,6 +4102,7 @@ void CompProccall0to6Args (
 //        Emit("%s", NAME_FUNC( FUNC_CALL(stat) ));
     }
     else {
+        printf("not global");
         func = CompExpr( FUNC_CALL(stat) );
         //CompCheckFunc( func );
     }
@@ -4251,12 +4256,12 @@ void CompIf (
     /* get the number of branches                                          */
     nr = SIZE_STAT( stat ) / (2*sizeof(Stat));
 
-    Emit( "\n{'type':'if', 'cond':" );
+    Emit( "\n{\"type\":\"if\", \"cond\":" );
 
     /* compile the expression                                              */
     cond = CompBoolExpr( ADDR_STAT( stat )[0] );
 
-    Emit( ", 'then':" );
+    Emit( ", \"then\":" );
 
     /* emit the code to test the condition                                 */
     //Emit( "if ( %c ) {\n", cond );
@@ -4284,7 +4289,7 @@ void CompIf (
         if ( i == nr && TNUM_EXPR(ADDR_STAT(stat)[2*(i-1)]) == T_TRUE_EXPR )
             break;
 
-        Emit( "'else':{'type':'if', 'cond':" );
+        Emit( "\"else\":{\"type\":\"if\", \"cond\":" );
 
         /* emit the 'else' to connect this branch to the 'if' branch       */
         //Emit( "else {\n" );
@@ -4295,7 +4300,7 @@ void CompIf (
         /* compile the expression                                          */
         cond = CompBoolExpr( ADDR_STAT( stat )[2*(i-1)] );
 
-        Emit( ", 'then':" );
+        Emit( ", \"then\":" );
 
         /* emit the code to test the condition                             */
         //Emit( "if ( %c ) {\n", cond );
@@ -4316,7 +4321,7 @@ void CompIf (
     /* handle 'else' branch                                                */
     if ( i == nr ) {
 
-        Emit( "'else':" );
+        Emit( "\"else\":" );
 
         /* emit the 'else' to connect this branch to the 'if' branch       */
         //Emit( "else {\n" );
@@ -4473,7 +4478,7 @@ void CompFor (
         /* print a comment                                                 */
         if ( CompPass == 2 ) {
             PrintExpr( ADDR_STAT(stat)[0] );
-            Emit( "', 'in':" );
+            Emit( "\", \"in\":" );
         }
 
         /* get the variable (initialize them first to please 'lint')       */
@@ -4767,7 +4772,7 @@ void CompReturnObj (
 void CompReturnVoid (
     Stat                stat )
 {
-    Emit("{ 'type':'return', 'void':'true'}");
+    Emit("{ \"type\":\"return\", \"void\":\"true\"}");
 }
 
 
@@ -4781,18 +4786,23 @@ void            CompAssLVar (
     LVar                lvar;           /* local variable                  */
     CVar                rhs;            /* right hand side                 */
 
-    Emit( "{'type':'assign', 'subtype':'LVar', " );
+    //TODO
+    Emit( "{\"type\":\"assign\", \"subtype\":\"LVar\", " );
 
+    Emit("\"right\":");
     /* compile the right hand side expression                              */
     rhs = CompExpr( ADDR_STAT(stat)[1] );
 
+    Emit(", \"left\":");
     /* emit the code for the assignment                                    */
     lvar = (LVar)(ADDR_STAT(stat)[0]);
     if ( CompGetUseHVar( lvar ) ) {
         //Emit( "ASS_LVAR( %d, %c );\n", GetIndxHVar(lvar), rhs );
+        Emit( "\"t_%d\"", GetIndxHVar(lvar));
     }
     else {
         //Emit( "%c = %c;\n", CVAR_LVAR(lvar), rhs );
+        Emit( "\"%s\"", NAME_LVAR(lvar));
         SetInfoCVar( CVAR_LVAR(lvar), GetInfoCVar( rhs ) );
     }
 
@@ -4922,7 +4932,7 @@ void            CompUnbGVar (
 
     /* emit the code for the assignment                                    */
     gvar = (GVar)(ADDR_STAT(stat)[0]);
-    Emit( ", 'gvar':'%n'", NameGVar(gvar));
+    Emit( ", 'gvar':'%s'", NameGVar(gvar));
     CompSetUseGVar( gvar, COMP_USE_GVAR_ID );
     //Emit( "AssGVar( G_%n, 0 );\n", NameGVar(gvar) );
     
@@ -5752,9 +5762,10 @@ void CompFunc (
     info = INFO_FEXP( CURR_FUNC );
 
     for ( i = 1; i <= narg; i++ ) {
-        //Compile the parameters!
-        Emit("%c", CVAR_LVAR(i));
-        printf("%d", i);
+        Emit("\"%s\"", NAME_LVAR(i));
+        if(i < narg) {
+          Emit(", ");
+        }
     }
 
     Emit("], \"body\":");
@@ -5797,6 +5808,14 @@ Int CompileFunc (
     if ( ! OpenOutput( output ) ) {
         return 0;
     }
+
+    json = fopen("test.json", "w");
+
+    if(!json) {
+      printf("JSON file couldn't be openend.");
+      exit(EXIT_FAILURE);
+    }
+
     col = SyNrCols;
     SyNrCols = 255;
 
@@ -5826,6 +5845,8 @@ Int CompileFunc (
     SyNrCols = col;
     CloseOutput();
 
+    fclose(json);
+    
     /* return success                                                      */
     return CompFunctionsNr;
 }
