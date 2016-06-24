@@ -703,7 +703,7 @@ void            CompSetUseRNam (
     RNam                rnam,
     UInt                mode )
 {
-    Emit( "'%n'", NAME_RNAM(rnam) );
+    Emit( "\"%n\"", NAME_RNAM(rnam) );
 
     /* only mark in pass 1                                                 */
     if ( CompPass != 1 )  return;
@@ -1081,7 +1081,7 @@ CVar CompFunccall0to6Args (
     Int                 narg;           /* number of arguments             */
     Int                 i;              /* loop variable                   */
 
-    Emit("CompFunccall0to6Args");
+    Emit("{ \"type\":\"functionCall\", \"name\":"); 
 
     /* special case to inline 'Length'                                     */
     if ( CompFastListFuncs
@@ -1113,6 +1113,8 @@ CVar CompFunccall0to6Args (
         CompCheckFunc( func );
     }
 
+    Emit(", \"args\":[");
+
     /* compile the argument expressions                                    */
     narg = NARG_SIZE_CALL(SIZE_EXPR(expr));
     for ( i = 1; i <= narg; i++ ) {
@@ -1127,16 +1129,14 @@ CVar CompFunccall0to6Args (
     for ( i = 1; i <= narg; i++ ) {
         //Emit( ", %c", args[i] );
     }
-    //Emit( " );\n" );
-
-    /* emit code for the check (sets the information for the result)       */
-    CompCheckFuncResult( result );
 
     /* free the temporaries                                                */
     for ( i = narg; 1 <= i; i-- ) {
         if ( IS_TEMP_CVAR( args[i] ) )  FreeTemp( TEMP_CVAR( args[i] ) );
     }
     if ( IS_TEMP_CVAR( func ) )  FreeTemp( TEMP_CVAR( func ) );
+
+    Emit("] }");
 
     /* return the result                                                   */
     return result;
@@ -1407,9 +1407,7 @@ CVar CompAnd (
 
     /* emit the code for the case that the left value is a filter          */
     //Emit( "else {\n" );
-    CompCheckFunc( left );
-    right2 = CompExpr( ADDR_EXPR(expr)[1] );
-    CompCheckFunc( right2 );
+    //right2 = CompExpr( ADDR_EXPR(expr)[1] );
     //Emit( "%c = NewAndFilter( %c, %c );\n", val, left, right2 );
     //Emit( "}\n" );
 
@@ -4071,7 +4069,7 @@ void CompProccall0to6Args (
 
     /* print a comment                                                     */
 //    if ( CompPass == 2 ) {
-        Emit( "\n{ 'type':'function', 'name':");
+        Emit( "\n{ \"type\":\"functionCall\", \"name\":");
 //        Emit( "AssGVar( G_%n, 0 );\n", NameGVar(gvar) );
         //PrintStat( stat );
  //   }
@@ -4104,7 +4102,7 @@ void CompProccall0to6Args (
         //CompCheckFunc( func );
     }
 
-    Emit(", 'args':[");
+    Emit(", \"args\":[");
 
     /* compile the argument expressions                                    */
     narg = NARG_SIZE_CALL(SIZE_STAT(stat));
@@ -4147,7 +4145,7 @@ void CompProccallXArgs (
 
     /* print a comment                                                     */
     //if ( CompPass == 2 ) {
-        Emit( "\n{ 'type':'function', 'args':'" );
+        Emit( "\n{ \"type\":\"functionCall\", \"args\":" );
     //    PrintStat( stat );
     //}
 
@@ -4178,7 +4176,7 @@ void CompProccallXArgs (
         }
     }
 
-    Emit( "'} \n" );
+    Emit( "} \n" );
 
     /* emit the code for the procedure call                                */
     //Emit( "CALL_XARGS( %c, %c );\n", func, argl );
@@ -4743,9 +4741,7 @@ void CompReturnObj (
     CVar                obj;            /* returned object                 */
 
         //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( " {\"return\":\"" ); 
-   // PrintStat( stat );
-    Emit( "\"} " );
+    Emit( " {\"return\":" ); 
 
     /* compile the expression                                              */
     obj = CompExpr( ADDR_STAT(stat)[0] );
@@ -4759,6 +4755,8 @@ void CompReturnObj (
 
     /* free the temporary                                                  */
     if ( IS_TEMP_CVAR( obj ) )  FreeTemp( TEMP_CVAR( obj ) );
+    
+    Emit( "} " );
 }
 
 
@@ -5725,8 +5723,8 @@ void CompFunc (
     narg = (NARG_FUNC(func) != -1 ? NARG_FUNC(func) : 1);
     nloc = NLOC_FUNC(func);
 
-    Emit("{ \"type\":\"function\" ");
- 
+    Emit("{ \"type\":\"function\", \"param\":[");
+  
     /* in the first pass allocate the info bag                             */
     if ( CompPass == 1 ) {
         CompFunctionsNr++;
@@ -5753,6 +5751,15 @@ void CompFunc (
     /* get the info bag                                                    */
     info = INFO_FEXP( CURR_FUNC );
 
+    for ( i = 1; i <= narg; i++ ) {
+        //Compile the parameters!
+        Emit("%c", CVAR_LVAR(i));
+        printf("%d", i);
+    }
+
+    Emit("], \"body\":");
+ 
+
     /* we know all the arguments have values                               */
     for ( i = 1; i <= narg; i++ ) {
         SetInfoCVar( CVAR_LVAR(i), W_BOUND );
@@ -5764,17 +5771,10 @@ void CompFunc (
     /* compile the body                                                    */
     CompStat( FIRST_STAT_CURR_FUNC );
 
-    /* compile the inner functions                                        */
-    //fexs = FEXS_FUNC(func);
-    //for ( i = 1;  i <= LEN_PLIST(fexs);  i++ ) {
-    //    CompFunc( ELM_PLIST( fexs, i ) );
-    //}
-
     /* switch back to old frame                                            */
     SWITCH_TO_OLD_LVARS( oldFrame );
   
     Emit("}");
-
 }
 
 
