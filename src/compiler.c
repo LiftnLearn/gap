@@ -1091,24 +1091,6 @@ CVar CompFunccall0to6Args (
 
     Emit("{ \"type\":\"functionCall\", \"name\":"); 
 
-    /* special case to inline 'Length'                                     */
-    if ( CompFastListFuncs
-      && TNUM_EXPR( FUNC_CALL(expr) ) == T_REF_GVAR
-      && ADDR_EXPR( FUNC_CALL(expr) )[0] == G_Length
-      && NARG_SIZE_CALL(SIZE_EXPR(expr)) == 1 ) {
-        result = CVAR_TEMP( NewTemp( "result" ) );
-        args[1] = CompExpr( ARGI_CALL(expr,1) );
-        if ( CompFastPlainLists ) {
-            //Emit( "C_LEN_LIST_FPL( %c, %c )\n", result, args[1] );
-        }
-        else {
-            //Emit( "C_LEN_LIST( %c, %c )\n", result, args[1] );
-        }
-        SetInfoCVar( result, W_INT_SMALL );
-        if ( IS_TEMP_CVAR( args[1] ) )  FreeTemp( TEMP_CVAR( args[1] ) );
-        return result;
-    }
-
     /* allocate a temporary for the result                                 */
     result = CVAR_TEMP( NewTemp( "result" ) );
 
@@ -4069,12 +4051,8 @@ void CompProccall0to6Args (
     UInt                narg;           /* number of arguments             */
     UInt                i;              /* loop variable                   */
 
-    /* print a comment                                                     */
-//    if ( CompPass == 2 ) {
         Emit( "\n{ \"type\":\"functionCall\", \"name\":");
 //        Emit( "AssGVar( G_%n, 0 );\n", NameGVar(gvar) );
-        //PrintStat( stat );
- //   }
 
     /* special case to inline 'Add'                                        */
     if ( CompFastListFuncs
@@ -4146,11 +4124,7 @@ void CompProccallXArgs (
     UInt                narg;           /* number of arguments             */
     UInt                i;              /* loop variable                   */
 
-    /* print a comment                                                     */
-    //if ( CompPass == 2 ) {
-        Emit( "\n{ \"type\":\"functionCall\", \"args\":" );
-    //    PrintStat( stat );
-    //}
+    Emit( "\n{ \"type\":\"functionCall\", \"args\":" );
 
     /* compile the reference to the function                               */
     if ( TNUM_EXPR( FUNC_CALL(stat) ) == T_REF_GVAR ) {
@@ -4255,6 +4229,7 @@ void CompIf (
     nr = SIZE_STAT( stat ) / (2*sizeof(Stat));
 
     Emit( "\n{\"type\":\"if\", \"cond\":" );
+//    Emit("open");
 
     /* compile the expression                                              */
     cond = CompBoolExpr( ADDR_STAT( stat )[0] );
@@ -4286,6 +4261,7 @@ void CompIf (
             break;
 
         Emit( ",\"else\":{\"type\":\"if\", \"cond\":" );
+    //    Emit("open");
 
         /* emit the 'else' to connect this branch to the 'if' branch       */
         //Emit( "else {\n" );
@@ -4328,7 +4304,6 @@ void CompIf (
 
         /* remember what we know after executing one of the previous bodies*/
         MergeInfoCVars( info_out, INFO_FEXP(CURR_FUNC) );
-
     }
 
     /* fake empty 'else' branch                                            */
@@ -4351,9 +4326,11 @@ void CompIf (
         if ( i == nr && TNUM_EXPR(ADDR_STAT(stat)[2*(i-1)]) == T_TRUE_EXPR )
             break;
         Emit( "}\n" );
+   //     Emit("close");
     }
     
     Emit( "} \n" );
+    //Emit("endOfElse close");
 
     /* put what we know into the current info                              */
     CopyInfoCVars( INFO_FEXP(CURR_FUNC), info_out );
