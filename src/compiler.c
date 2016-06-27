@@ -999,6 +999,9 @@ CVar (* CompExprFuncs[256]) ( Expr expr );
 CVar CompExpr (
     Expr                expr )
 {
+    //findme
+//    printf("%d ",  T_ISB_GVAR);
+//    Emit("%d\n", TNUM_EXPR(expr));
     return (* CompExprFuncs[ TNUM_EXPR(expr) ])( expr );
 }
 
@@ -1617,10 +1620,6 @@ CVar CompEqBool (
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
-
-    /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
-    right = CompExpr( ADDR_EXPR(expr)[1] );
 
     /* emit the code                                                       */
     if ( HasInfoCVar(left,W_INT_SMALL) && HasInfoCVar(right,W_INT_SMALL) ) {
@@ -3180,13 +3179,13 @@ CVar CompRefLVar (
     }
 
     /* emit the code to get the value                                      */
-//    if ( CompGetUseHVar( lvar ) ) {
-//        val = CVAR_TEMP( NewTemp( "val" ) );
-//        //Emit( "%c = OBJ_LVAR( %d );\n", val, GetIndxHVar(lvar) );
-//    }
-//    else {
-//        val = CVAR_LVAR(lvar);
-//    }
+    if ( CompGetUseHVar( lvar ) ) {
+        val = CVAR_TEMP( NewTemp( "val" ) );
+        //Emit( "%c = OBJ_LVAR( %d );\n", val, GetIndxHVar(lvar) );
+    }
+    else {
+        val = CVAR_LVAR(lvar);
+    }
 
     Emit("\"%s\"", NAME_LVAR(lvar));
 
@@ -3259,6 +3258,8 @@ CVar CompRefHVar (
     /* emit the code to check that the variable has a value                */
     CompCheckBound( val, NAME_HVAR(hvar) );
 
+    Emit("\"%s\"", NAME_HVAR(hvar));
+ 
     /* return the value                                                    */
     return val;
 }
@@ -3404,29 +3405,20 @@ CVar CompElmList (
     CVar                list;           /* list                            */
     CVar                pos;            /* position                        */
 
+    Emit( "{ \"type\":\"listAccess\", \"list\":");
+
     /* allocate a new temporary for the element                            */
     elm = CVAR_TEMP( NewTemp( "elm" ) );
 
     /* compile the list expression (checking is done by 'ELM_LIST')        */
     list = CompExpr( ADDR_EXPR(expr)[0] );
 
+    Emit( ", \"position\":");
+
     /* compile and check the position expression                           */
     pos = CompExpr( ADDR_EXPR(expr)[1] );
-    CompCheckIntPos( pos );
 
-    /* emit the code to get the element                                    */
-    if (        CompCheckListElements &&   CompFastPlainLists ) {
-        //Emit( "C_ELM_LIST_FPL( %c, %c, %c )\n", elm, list, pos );
-    }
-    else if (   CompCheckListElements && ! CompFastPlainLists ) {
-        //Emit( "C_ELM_LIST( %c, %c, %c );\n", elm, list, pos );
-    }
-    else if ( ! CompCheckListElements &&   CompFastPlainLists ) {
-        //Emit( "C_ELM_LIST_NLE_FPL( %c, %c, %c );\n", elm, list, pos );
-    }
-    else {
-        //Emit( "C_ELM_LIST_NLE( %c, %c, %c );\n", elm, list, pos );
-    }
+    Emit( "}" );
 
     /* we know that we have a value                                        */
     SetInfoCVar( elm, W_BOUND );
@@ -3453,6 +3445,8 @@ CVar CompElmsList (
 
     /* allocate a new temporary for the elements                           */
     elms = CVAR_TEMP( NewTemp( "elms" ) );
+
+    Emit("elmslist");
 
     /* compile the list expression (checking is done by 'ElmsListCheck')   */
     list = CompExpr( ADDR_EXPR(expr)[0] );
@@ -3486,6 +3480,8 @@ CVar CompElmListLev (
     CVar                pos;            /* position                        */
     Int                 level;          /* level                           */
 
+    Emit("elmListLev");
+
     /* compile the lists expression                                        */
     lists = CompExpr( ADDR_EXPR(expr)[0] );
 
@@ -3517,6 +3513,8 @@ CVar CompElmsListLev (
     CVar                lists;          /* lists                           */
     CVar                poss;           /* positions                       */
     Int                 level;          /* level                           */
+
+    Emit("ElmsListLev");
 
     /* compile the lists expression                                        */
     lists = CompExpr( ADDR_EXPR(expr)[0] );
@@ -3727,23 +3725,23 @@ CVar CompElmPosObj (
     CVar                list;           /* list                            */
     CVar                pos;            /* position                        */
 
+    Emit("{\"type\":\"getListElement\", \"compiledIn\":\"CompElmPosObj\""
+         ", \"list\":"
+    );
+
     /* allocate a new temporary for the element                            */
     elm = CVAR_TEMP( NewTemp( "elm" ) );
 
     /* compile the list expression (checking is done by 'ELM_LIST')        */
     list = CompExpr( ADDR_EXPR(expr)[0] );
 
+    Emit(", \"position\":");
+
     /* compile and check the position expression                           */
     pos = CompExpr( ADDR_EXPR(expr)[1] );
     CompCheckIntSmallPos( pos );
 
-    /* emit the code to get the element                                    */
-    if (        CompCheckPosObjElements ) {
-        //Emit( "C_ELM_POSOBJ( %c, %c, %i )\n", elm, list, pos );
-    }
-    else if ( ! CompCheckPosObjElements ) {
-        //Emit( "C_ELM_POSOBJ_NLE( %c, %c, %i );\n", elm, list, pos );
-    }
+    Emit("}");
 
     /* we know that we have a value                                        */
     SetInfoCVar( elm, W_BOUND );
@@ -4279,8 +4277,6 @@ void CompIf (
     CopyInfoCVars( info_out, INFO_FEXP(CURR_FUNC) );
 
     /* emit the rest code                                                  */
-    
-    Emit( ", " );
 
     /* loop over the 'elif' branches                                       */
     for ( i = 2; i <= nr; i++ ) {
@@ -4289,7 +4285,7 @@ void CompIf (
         if ( i == nr && TNUM_EXPR(ADDR_STAT(stat)[2*(i-1)]) == T_TRUE_EXPR )
             break;
 
-        Emit( "\"else\":{\"type\":\"if\", \"cond\":" );
+        Emit( ",\"else\":{\"type\":\"if\", \"cond\":" );
 
         /* emit the 'else' to connect this branch to the 'if' branch       */
         //Emit( "else {\n" );
@@ -4314,14 +4310,12 @@ void CompIf (
 
         /* remember what we know after executing one of the previous bodies*/
         MergeInfoCVars( info_out, INFO_FEXP(CURR_FUNC) );
-
-        Emit( " " );
     }
 
     /* handle 'else' branch                                                */
     if ( i == nr ) {
 
-        Emit( "\"else\":" );
+        Emit( ",\"else\":" );
 
         /* emit the 'else' to connect this branch to the 'if' branch       */
         //Emit( "else {\n" );
@@ -4385,7 +4379,7 @@ void CompFor (
     Bag                 prev;           /* previous temp-info              */
     Int                 i;              /* loop variable                   */
 
-    Emit( "\n{ 'type':'for', 'var':'" );
+    Emit( "\n{ \"type\":\"for\", \"var\":\"" );
 
     /* handle 'for <lvar> in [<first>..<last>] do'                         */
     if ( IS_REFLVAR( ADDR_STAT(stat)[0] )
@@ -4393,13 +4387,11 @@ void CompFor (
       && TNUM_EXPR( ADDR_STAT(stat)[1] ) == T_RANGE_EXPR
       && SIZE_EXPR( ADDR_STAT(stat)[1] ) == 2*sizeof(Expr) ) {
 
-      if(CompPass == 2) {
-        PrintExpr( ADDR_STAT(stat)[0] );
-        Emit( "', 'in':" );
-      }
-
         /* get the local variable                                          */
         var = LVAR_REFLVAR( ADDR_STAT(stat)[0] );
+
+        Emit("%s", NAME_LVAR( var ));
+        Emit( "\", \"in\":" );
 
         /* allocate a new temporary for the loop variable                  */
         lidx = CVAR_TEMP( NewTemp( "lidx" ) );
@@ -4432,6 +4424,7 @@ void CompFor (
             else {
                 SetInfoCVar( CVAR_LVAR(var), W_INT_SMALL );
             }
+            //TODO: what is this? why is this loop compiled twice?
             for ( i = 2; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
                 CompStat( ADDR_STAT(stat)[i] );
             }
@@ -4456,14 +4449,11 @@ void CompFor (
             SetInfoCVar( CVAR_LVAR(var), W_INT_SMALL );
         }
 
+        Emit(", \"do\":");
         /* compile the body                                                */
         for ( i = 2; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
             CompStat( ADDR_STAT(stat)[i] );
         }
-
-        /* emit the end code                                               */
-        //Emit( "\n}\n" );
-        //Emit( "/* od */\n" );
 
         /* free the temporaries                                            */
         if ( IS_TEMP_CVAR( last  ) )  FreeTemp( TEMP_CVAR( last  ) );
@@ -4471,16 +4461,11 @@ void CompFor (
         if ( IS_TEMP_CVAR( lidx  ) )  FreeTemp( TEMP_CVAR( lidx  ) );
 
     }
-
     /* handle other loops                                                  */
     else {
 
-        /* print a comment                                                 */
-        if ( CompPass == 2 ) {
-            PrintExpr( ADDR_STAT(stat)[0] );
-            Emit( "\", \"in\":" );
-        }
-
+        //TODO:
+        
         /* get the variable (initialize them first to please 'lint')       */
         if ( IS_REFLVAR( ADDR_STAT(stat)[0] )
           && ! CompGetUseHVar( LVAR_REFLVAR( ADDR_STAT(stat)[0] ) ) ) {
@@ -4511,6 +4496,16 @@ void CompFor (
             CompSetUseGVar( var, COMP_USE_GVAR_ID );
             vart = 'g';
         }
+
+        if(vart == 'l' || vart == 'm') {
+            Emit("%s", NAME_LVAR( var ));
+        } else if(vart == 'g') {
+          Emit( "%s", NameGVar(var));
+        } else if(vart == 'h') {
+          Emit( "%s", NAME_HVAR(var));
+        }
+
+        Emit( "\", \"in\":" );
 
         /* allocate a new temporary for the loop variable                  */
         lidx   = CVAR_TEMP( NewTemp( "lidx"   ) );
@@ -4570,21 +4565,18 @@ void CompFor (
             SetInfoCVar( CVAR_LVAR(var), W_BOUND );
         }
 
+        Emit(", \"do\":");
+
         /* compile the body                                                */
         for ( i = 2; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
             CompStat( ADDR_STAT(stat)[i] );
         }
-
-        /* emit the end code                                               */
-        //Emit( "\n}\n" );
-        //Emit( "/* od */\n" );
 
         /* free the temporaries                                            */
         if ( IS_TEMP_CVAR( list   ) )  FreeTemp( TEMP_CVAR( list   ) );
         if ( IS_TEMP_CVAR( islist ) )  FreeTemp( TEMP_CVAR( islist ) );
         if ( IS_TEMP_CVAR( elm    ) )  FreeTemp( TEMP_CVAR( elm    ) );
         if ( IS_TEMP_CVAR( lidx   ) )  FreeTemp( TEMP_CVAR( lidx   ) );
-
     }
   
     Emit( "}\n" );
@@ -4636,6 +4628,9 @@ void CompWhile (
 
     /* compile the body                                                    */
     for ( i = 1; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
+        if( i > 1) {
+            Emit(", ");
+        }
         CompStat( ADDR_STAT(stat)[i] );
     }
 
@@ -4673,7 +4668,7 @@ void CompRepeat (
         if ( IS_TEMP_CVAR( cond ) )  FreeTemp( TEMP_CVAR( cond ) );
         MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
     } while ( ! IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
-    CompPass = pass;
+    
 
     /* print a comment                                                     */
     if ( CompPass == 2 ) {
@@ -4905,7 +4900,7 @@ void CompAssGVar (
     /* emit the code for the assignment                                    */
     gvar = (GVar)(ADDR_STAT(stat)[0]);
     CompSetUseGVar( gvar, COMP_USE_GVAR_ID );
-    Emit( "'gvar':'%n'", NameGVar(gvar));
+    Emit( "'gvar':'%s'", NameGVar(gvar));
     Emit(", 'rightHandSide':" );
 
     /* compile the right hand side expression                              */
