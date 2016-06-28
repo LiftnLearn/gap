@@ -728,9 +728,34 @@ UInt            CompGetUseRNam (
 **  ('INTOBJ_INT(<int>)'  for integers,  'a_<name>' for arguments, 'l_<name>'
 **  for locals, 't_<nr>' for temporaries), and '%%' outputs a single '%'.
 */
-Int             EmitIndent;
+char* escapeWhitespace(char* str) {
+    //allocate new output string
+    char* newStr = (char*) malloc(sizeof(char) * strlen(str) * 2);
+    
+    char* p, *j;
+    for(p = str, j = newStr; *p != '\0'; ++j, ++p) {
+        if(isspace(*p)) {
+            if(*p == ' ') {
+              *j = *p;
+            } else if(*p == '\n') {
+                *j = '\\';
+                ++j; 
+                *j = 'n';
+            } else if(*p == '\t') {
+                *j = '\\';
+                ++j;
+                *j = 't';
+            } else {
+              fprintf(stderr, "ERROR: unknown escape sequence in compiler.c, escapeWhitespace\n");
+            }
+        } else {
+            *j = *p;
+        }
+    }
 
-Int             EmitIndent2;
+    *j = '\0';
+    return newStr;
+}
 
 void            Emit (
     const char *        fmt,
@@ -741,8 +766,6 @@ void            Emit (
     Int                 dint;           /* integer argument                */
     CVar                cvar;           /* C variable argument             */
     Char *              string;         /* string argument                 */
-    const Char *        p;              /* loop variable                   */
-    Char *              q;              /* loop variable                   */
     const Char *        hex = "0123456789ABCDEF";
 
     /* are we in pass 2?                                                   */
@@ -751,10 +774,28 @@ void            Emit (
     /* get the information bag                                             */
     narg = (NARG_FUNC( CURR_FUNC ) != -1 ? NARG_FUNC( CURR_FUNC ) : 1);
 
-    /* loop over the format string                                         */
     va_start( ap, fmt );
 
-    vfprintf(json, fmt, ap);
+    /* preformat strings / escape whitespace */
+    
+    for(const char *p = fmt; *p != '\0'; ++p) {
+        if(*p == '%') {
+            ++p;
+            if(*p == 's') { //found string
+                char* str = va_arg(ap, char*);
+                str = escapeWhitespace(str);
+                fprintf(json, "%s", str);
+                free(str);
+            } else if(*p == 'd') { //found integer
+                int i = va_arg(ap, int);
+                fprintf(json, "%d", i);
+            } else {
+                fprintf(stderr, "ERROR: Unexpected string in compiler.c, Emit\n");
+            }
+        } else { //just print character
+            fputc(*p, json);
+        }
+    }
 
     va_end( ap );
 
@@ -3865,7 +3906,7 @@ void CompStat (
 void CompUnknownStat (
     Stat                stat )
 {
-    printf("ERROR: unknownStat\n");
+    printf("ERROR: unknownStat");
     //Emit( "CANNOT COMPILE STATEMENT OF TNUM %d;\n", TNUM_STAT(stat) );
 }
 
@@ -3889,7 +3930,7 @@ void CompProccall0to6Args (
     UInt                narg;           /* number of arguments             */
     UInt                i;              /* loop variable                   */
 
-        Emit( "\n{ \"type\":\"functionCall\", \"name\":");
+        Emit( "{ \"type\":\"functionCall\", \"name\":");
 //        Emit( "AssGVar( G_%n, 0 );\n", NameGVar(gvar) );
 
     /* special case to inline 'Add'                                        */
@@ -3937,9 +3978,8 @@ void CompProccall0to6Args (
     //for ( i = 1; i <= narg; i++ ) {
         //Emit( ", %c", args[i] );
     //}
-    //Emit( " );\n" );
 
-    Emit( "]} \n" );
+    Emit( "]}" );
 
     /* free the temporaries                                                */
     for ( i = narg; 1 <= i; i-- ) {
@@ -3962,7 +4002,7 @@ void CompProccallXArgs (
     UInt                narg;           /* number of arguments             */
     UInt                i;              /* loop variable                   */
 
-    Emit( "\n{ \"type\":\"functionCall\", \"args\":" );
+    Emit( "{ \"type\":\"functionCall\", \"args\":" );
 
     /* compile the reference to the function                               */
     if ( TNUM_EXPR( FUNC_CALL(stat) ) == T_REF_GVAR ) {
@@ -3991,7 +4031,7 @@ void CompProccallXArgs (
         }
     }
 
-    Emit( "} \n" );
+    Emit( "}" );
 
     /* emit the code for the procedure call                                */
     //Emit( "CALL_XARGS( %c, %c );\n", func, argl );
@@ -4066,7 +4106,7 @@ void CompIf (
     /* get the number of branches                                          */
     nr = SIZE_STAT( stat ) / (2*sizeof(Stat));
 
-    Emit( "\n{\"type\":\"if\", \"cond\":" );
+    Emit( "{\"type\":\"if\", \"cond\":" );
 //    Emit("open");
 
     /* compile the expression                                              */
@@ -4163,11 +4203,11 @@ void CompIf (
     for ( i = 2; i <= nr; i++ ) {
         if ( i == nr && TNUM_EXPR(ADDR_STAT(stat)[2*(i-1)]) == T_TRUE_EXPR )
             break;
-        Emit( "}\n" );
+        Emit( "}" );
    //     Emit("close");
     }
     
-    Emit( "} \n" );
+    Emit( "}" );
     //Emit("endOfElse close");
 
     /* put what we know into the current info                              */
@@ -4194,7 +4234,7 @@ void CompFor (
     Bag                 prev;           /* previous temp-info              */
     Int                 i;              /* loop variable                   */
 
-    Emit( "\n{ \"type\":\"for\", \"var\":\"" );
+    Emit( "{ \"type\":\"for\", \"var\":\"" );
 
     /* handle 'for <lvar> in [<first>..<last>] do'                         */
     if ( IS_REFLVAR( ADDR_STAT(stat)[0] )
@@ -4394,7 +4434,7 @@ void CompFor (
         if ( IS_TEMP_CVAR( lidx   ) )  FreeTemp( TEMP_CVAR( lidx   ) );
     }
   
-    Emit( "}\n" );
+    Emit( "}" );
 }
 
 
@@ -4429,7 +4469,7 @@ void CompWhile (
     //Emit( "}\n" );
     CompPass = pass;
 
-    Emit( "{'type':'while', 'cond':" );
+    Emit( "{\"type\":\"while\", \"cond\":" );
 
     /* emit the code for the loop                                          */
     //Emit( "while ( 1 ) {\n" );
@@ -4439,7 +4479,7 @@ void CompWhile (
     //Emit( "if ( ! %c ) break;\n", cond );
     if ( IS_TEMP_CVAR( cond ) )  FreeTemp( TEMP_CVAR( cond ) );
 
-    Emit( ", 'do':[" );
+    Emit( ", \"do\":[" );
 
     /* compile the body                                                    */
     for ( i = 1; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
