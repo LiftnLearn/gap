@@ -202,21 +202,6 @@ Int CompPass;
 
 /****************************************************************************
 **
-
-*V  compilerMagic1  . . . . . . . . . . . . . . . . . . . . .  current magic1
-*/
-static Int compilerMagic1;
-
-
-/****************************************************************************
-**
-*V  compilerMagic2  . . . . . . . . . . . . . . . . . . . . .  current magic2
-*/
-static Char * compilerMagic2;
-
-
-/****************************************************************************
-**
 *T  CVar  . . . . . . . . . . . . . . . . . . . . . . .  type for C variables
 **
 **  A C variable represents the result of compiling an expression.  There are
@@ -320,50 +305,50 @@ void            SetInfoCVar (
     CVar                cvar,
     UInt                type )
 {
-    Bag                 info;           /* its info bag                    */
-
-    /* get the information bag                                             */
-    info = INFO_FEXP( CURR_FUNC );
-
-    /* set the type of a temporary                                         */
-    if ( IS_TEMP_CVAR(cvar) ) {
-        TNUM_TEMP_INFO( info, TEMP_CVAR(cvar) ) = type;
-    }
-
-    /* set the type of a lvar (but do not change if its a higher variable) */
-    else if ( IS_LVAR_CVAR(cvar)
-           && TNUM_LVAR_INFO( info, LVAR_CVAR(cvar) ) != W_HIGHER ) {
-        TNUM_LVAR_INFO( info, LVAR_CVAR(cvar) ) = type;
-    }
+//    Bag                 info;           /* its info bag                    */
+//
+//    /* get the information bag                                             */
+//    info = INFO_FEXP( CURR_FUNC );
+//
+//    /* set the type of a temporary                                         */
+//    if ( IS_TEMP_CVAR(cvar) ) {
+//        TNUM_TEMP_INFO( info, TEMP_CVAR(cvar) ) = type;
+//    }
+//
+//    /* set the type of a lvar (but do not change if its a higher variable) */
+//    else if ( IS_LVAR_CVAR(cvar)
+//           && TNUM_LVAR_INFO( info, LVAR_CVAR(cvar) ) != W_HIGHER ) {
+//        TNUM_LVAR_INFO( info, LVAR_CVAR(cvar) ) = type;
+//    }
 }
 
 Int             GetInfoCVar (
     CVar                cvar )
 {
-    Bag                 info;           /* its info bag                    */
-
-    /* get the information bag                                             */
-    info = INFO_FEXP( CURR_FUNC );
-
-    /* get the type of an integer                                          */
-    if ( IS_INTG_CVAR(cvar) ) {
-        return ((0 < INTG_CVAR(cvar)) ? W_INT_SMALL_POS : W_INT_SMALL);
-    }
-
-    /* get the type of a temporary                                         */
-    else if ( IS_TEMP_CVAR(cvar) ) {
-        return TNUM_TEMP_INFO( info, TEMP_CVAR(cvar) );
-    }
-
-    /* get the type of a lvar                                              */
-    else if ( IS_LVAR_CVAR(cvar) ) {
-        return TNUM_LVAR_INFO( info, LVAR_CVAR(cvar) );
-    }
-
-    /* hmm, avoid warning by compiler                                      */
-    else {
-        return 0;
-    }
+//    Bag                 info;           /* its info bag                    */
+//
+//    /* get the information bag                                             */
+//    info = INFO_FEXP( CURR_FUNC );
+//
+//    /* get the type of an integer                                          */
+//    if ( IS_INTG_CVAR(cvar) ) {
+//        return ((0 < INTG_CVAR(cvar)) ? W_INT_SMALL_POS : W_INT_SMALL);
+//    }
+//
+//    /* get the type of a temporary                                         */
+//    else if ( IS_TEMP_CVAR(cvar) ) {
+//        return TNUM_TEMP_INFO( info, TEMP_CVAR(cvar) );
+//    }
+//
+//    /* get the type of a lvar                                              */
+//    else if ( IS_LVAR_CVAR(cvar) ) {
+//        return TNUM_LVAR_INFO( info, LVAR_CVAR(cvar) );
+//    }
+//
+//    /* hmm, avoid warning by compiler                                      */
+//    else {
+//        return 0;
+//    }
 }
 
 Int             HasInfoCVar (
@@ -771,126 +756,6 @@ void            Emit (
 
     vfprintf(json, fmt, ap);
 
-    //for ( p = fmt; *p != '\0'; p++ ) {
-
-    //    /* print an indent, except for preprocessor commands               */
-    //    if ( *fmt != '#' ) {
-    //        if ( 0 < EmitIndent2 && *p == '}' ) EmitIndent2--;
-    //        while ( 0 < EmitIndent2-- )  Pr( " ", 0L, 0L );
-    //    }
-
-    //    /* format an argument                                              */
-    //    if ( *p == '%' ) {
-    //        p++;
-
-    //        /* emit an integer                                             */
-    //        if ( *p == 'd' ) {
-    //            dint = va_arg( ap, Int );
-    //            Pr( "%d", dint, 0L );
-    //        }
-
-    //        /* emit a string                                               */
-    //        else if ( *p == 's' ) {
-    //            string = va_arg( ap, Char* );
-    //            Pr( "%s", (Int)string, 0L );
-    //        }
-
-    //        /* emit a string                                               */
-    //        else if ( *p == 'S' ) {
-    //            string = va_arg( ap, Char* );
-    //            Pr( "%S", (Int)string, 0L );
-    //        }
-
-    //        /* emit a string                                               */
-    //        else if ( *p == 'C' ) {
-    //            string = va_arg( ap, Char* );
-    //            Pr( "%C", (Int)string, 0L );
-    //        }
-
-    //        /* emit a name                                                 */
-    //        else if ( *p == 'n' ) {
-    //            string = va_arg( ap, Char* );
-    //            for ( q = string; *q != '\0'; q++ ) {
-    //                if ( IsAlpha(*q) || IsDigit(*q) ) {
-    //                    Pr( "%c", (Int)(*q), 0L );
-    //                }
-    //                else if ( *q == '_' ) {
-    //                    Pr( "__", 0L, 0L );
-    //                }
-    //                else {
-    //                    Pr("_%c%c",hex[((UInt)*q)/16],hex[((UInt)*q)%16]);
-    //                }
-    //            }
-    //        }
-
-    //        /* emit a C variable                                           */
-    //        else if ( *p == 'c' ) {
-    //            cvar = va_arg( ap, CVar );
-    //            if ( IS_INTG_CVAR(cvar) ) {
-		//  Int x = INTG_CVAR(cvar);
-		//  if (x >= -(1L <<28) && x < (1L << 28))
-    //                Pr( "INTOBJ_INT(%d)", x, 0L );
-		//  else
-		//    Pr( "C_MAKE_MED_INT(%d)", x, 0L );
-    //            }
-    //            else if ( IS_TEMP_CVAR(cvar) ) {
-    //                Pr( "t_%d", TEMP_CVAR(cvar), 0L );
-    //            }
-    //            else if ( LVAR_CVAR(cvar) <= narg ) {
-    //                //Emit( "a_%n", NAME_LVAR( LVAR_CVAR(cvar) ) );
-    //            }
-    //            else {
-    //                //Emit( "l_%n", NAME_LVAR( LVAR_CVAR(cvar) ) );
-    //            }
-    //        }
-
-    //        /* emit a C variable                                           */
-    //        else if ( *p == 'i' ) {
-    //            cvar = va_arg( ap, CVar );
-    //            if ( IS_INTG_CVAR(cvar) ) {
-    //                Pr( "%d", INTG_CVAR(cvar), 0L );
-    //            }
-    //            else if ( IS_TEMP_CVAR(cvar) ) {
-    //                Pr( "INT_INTOBJ(t_%d)", TEMP_CVAR(cvar), 0L );
-    //            }
-    //            else if ( LVAR_CVAR(cvar) <= narg ) {
-    //                //Emit( "INT_INTOBJ(a_%n)", NAME_LVAR( LVAR_CVAR(cvar) ) );
-    //            }
-    //            else {
-    //                //Emit( "INT_INTOBJ(l_%n)", NAME_LVAR( LVAR_CVAR(cvar) ) );
-    //            }
-    //        }
-
-    //        /* emit a '%'                                                  */
-    //        else if ( *p == '%' ) {
-    //            Pr( "%%", 0L, 0L );
-    //        }
-
-    //        /* what                                                        */
-    //        else {
-    //            Pr( "%%illegal format statement", 0L, 0L );
-    //        }
-
-    //    }
-
-    //    else if ( *p == '{' ) {
-    //        Pr( "{", 0L, 0L );
-    //        EmitIndent++;
-    //    }
-    //    else if ( *p == '}' ) {
-    //        Pr( "}", 0L, 0L );
-    //        EmitIndent--;
-    //    }
-    //    else if ( *p == '\n' ) {
-    //        Pr( "\n", 0L, 0L );
-    //        EmitIndent2 = EmitIndent;
-    //    }
-
-    //    else {
-    //        Pr( "%c", (Int)(*p), 0L );
-    //    }
-
-    //}
     va_end( ap );
 
 }
@@ -1049,11 +914,6 @@ CVar CompUnknownBool (
     val = CompExpr( expr );
     CompCheckBool( val );
     
-
-    /* emit code to store the C boolean value in the result                */
-    //Emit( "%c = (Obj)(UInt)(%c != False);\n", res, val );
-    //Emit("%catomic", res);
-
     /* we know that the result is boolean (should be 'W_CBOOL')            */
     SetInfoCVar( res, W_BOOL );
 
@@ -1166,10 +1026,6 @@ CVar CompFunccallXArgs (
     //Emit( "SET_LEN_PLIST( %c, %d );\n", argl, narg );
     for ( i = 1; i <= narg; i++ ) {
         argi = CompExpr( ARGI_CALL( expr, i ) );
-        //Emit( "SET_ELM_PLIST( %c, %d, %c );\n", argl, i, argi );
-        if ( ! HasInfoCVar( argi, W_INT_SMALL ) ) {
-            //Emit( "CHANGED_BAG( %c );\n", argl );
-        }
         if ( IS_TEMP_CVAR( argi ) )  FreeTemp( TEMP_CVAR( argi ) );
     }
 
@@ -1245,14 +1101,8 @@ CVar CompFuncExpr (
     /* this should probably be done by 'NewFunction'                       */
     //Emit( "ENVI_FUNC( %c ) = TLS(CurrLVars);\n", func );
     tmp = CVAR_TEMP( NewTemp( "body" ) );
-    //Emit( "%c = NewBag( T_BODY, NUMBER_HEADER_ITEMS_BODY*sizeof(Obj) );\n", tmp );
-    //Emit( "SET_STARTLINE_BODY(%c, INTOBJ_INT(%d));\n", tmp, INT_INTOBJ(GET_STARTLINE_BODY(BODY_FUNC(fexp))));
-    //Emit( "SET_ENDLINE_BODY(%c, INTOBJ_INT(%d));\n", tmp, INT_INTOBJ(GET_ENDLINE_BODY(BODY_FUNC(fexp))));
-    //Emit( "SET_FILENAME_BODY(%c, FileName);\n",tmp);
-    //Emit( "BODY_FUNC(%c) = %c;\n", func, tmp );
+    
     FreeTemp( TEMP_CVAR( tmp ) );
-
-    //Emit( "CHANGED_BAG( TLS(CurrLVars) );\n" );
 
     /* we know that the result is a function                               */
     SetInfoCVar( func, W_FUNC );
@@ -1282,8 +1132,7 @@ CVar CompOr (
 
     /* compile the left expression                                         */
     left = CompBoolExpr( ADDR_EXPR(expr)[0] );
-    //Emit( "%c = (%c ? True : False);\n", val, left );
-    //Emit( "if ( %c == False ) {\n", val );
+    
     only_left = NewInfoCVars();
     CopyInfoCVars( only_left, INFO_FEXP(CURR_FUNC) );
 
@@ -2912,10 +2761,10 @@ CVar CompRangeExpr (
 
     /* evaluate the expressions                                            */
     if ( SIZE_EXPR(expr) == 2 * sizeof(Expr) ) {
-        Emit(", 'first':");
+        Emit("\"first\":");
         first  = CompExpr( ADDR_EXPR(expr)[0] );
         second = 0;
-        Emit(", 'last':");
+        Emit(", \"last\":");
         last   = CompExpr( ADDR_EXPR(expr)[1] );
     }
     else {
@@ -3163,7 +3012,6 @@ CVar CompRefLVar (
     /* emit the code to get the value                                      */
     if ( CompGetUseHVar( lvar ) ) {
         val = CVAR_TEMP( NewTemp( "val" ) );
-        //Emit( "%c = OBJ_LVAR( %d );\n", val, GetIndxHVar(lvar) );
     }
     else {
         val = CVAR_LVAR(lvar);
@@ -3196,14 +3044,10 @@ CVar CompIsbLVar (
     /* emit the code to get the value                                      */
     if ( CompGetUseHVar( lvar ) ) {
         val = CVAR_TEMP( NewTemp( "val" ) );
-        //Emit( "%c = OBJ_LVAR( %d );\n", val, GetIndxHVar(lvar) );
     }
     else {
         val = CVAR_LVAR(lvar);
     }
-
-    /* emit the code to check that the variable has a value                */
-    //Emit( "%c = ((%c != 0) ? True : False);\n", isb, val );
 
     /* we know that the result is boolean                                  */
     SetInfoCVar( isb, W_BOOL );
@@ -3233,10 +3077,6 @@ CVar CompRefHVar (
     /* allocate a new temporary for the value                              */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    /* emit the code to get the value                                      */
-    //Emit( "%c = OBJ_LVAR_%dUP( %d );\n",
-    //      val, GetLevlHVar(hvar), GetIndxHVar(hvar) );
-
     /* emit the code to check that the variable has a value                */
     CompCheckBound( val, NAME_HVAR(hvar) );
 
@@ -3265,13 +3105,6 @@ CVar CompIsbHVar (
     /* allocate new temporaries for the value and the result               */
     val = CVAR_TEMP( NewTemp( "val" ) );
     isb = CVAR_TEMP( NewTemp( "isb" ) );
-
-    /* emit the code to get the value                                      */
-    //Emit( "%c = OBJ_LVAR_%dUP( %d );\n",
-    //      val, GetLevlHVar(hvar), GetIndxHVar(hvar) );
-
-    /* emit the code to check that the variable has a value                */
-    //Emit( "%c = ((%c != 0) ? True : False);\n", isb, val );
 
     /* we know that the result is boolean                                  */
     SetInfoCVar( isb, W_BOOL );
@@ -3328,7 +3161,6 @@ CVar CompRefGVarFopy (
     /* allocate a new temporary for the value                              */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    //TODO:
     /* emit name of the global variable                                    */
     Emit("\"%s\"", NameGVar(gvar));
 
@@ -3832,12 +3664,18 @@ CVar CompElmComObjName (
     /* allocate a new temporary for the element                            */
     elm = CVAR_TEMP( NewTemp( "elm" ) );
 
+    Emit("{\"type\":\"recordAccess\", \"record\":");
+
     /* compile the record expression (checking is done by 'ELM_REC')       */
     record = CompExpr( ADDR_EXPR(expr)[0] );
+
+    Emit(", \"name\":");
 
     /* get the name (stored immediately in the expression)                 */
     rnam = (UInt)(ADDR_EXPR(expr)[1]);
     CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
+
+    Emit("}");
 
     /* emit the code to select the element of the record                   */
     //Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
@@ -4645,37 +4483,24 @@ void CompRepeat (
         if ( IS_TEMP_CVAR( cond ) )  FreeTemp( TEMP_CVAR( cond ) );
         MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
     } while ( ! IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
+    CompPass = pass;
     
 
-    /* print a comment                                                     */
-    if ( CompPass == 2 ) {
-        //Emit( "\n/* repeat */\n" );
-        Emit("{'type':'repeat', 'do':[");
-    }
-
-    /* emit the code for the loop                                          */
-    //Emit( "do {\n" );
+    Emit("{\"type\":\"repeat\", \"do\":[");
 
     /* compile the body                                                    */
     for ( i = 1; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
         CompStat( ADDR_STAT(stat)[i] );
     }
 
-    /* print a comment                                                     */
-    if ( CompPass == 2 ) {
-        //Emit( "\n/* until " );
-        Emit("], 'until':");
-        PrintExpr( ADDR_STAT(stat)[0] );
-        Emit( " }" );
-    }
+    Emit("], \"until\":");
 
     /* compile the condition                                               */
     cond = CompBoolExpr( ADDR_STAT(stat)[0] );
-    //Emit( "if ( %c ) break;\n", cond );
+    
     if ( IS_TEMP_CVAR( cond ) )  FreeTemp( TEMP_CVAR( cond ) );
 
-    /* thats it                                                            */
-    //Emit( "} while ( 1 );\n" );
+    Emit( " }" );
 }
 
 
@@ -4775,7 +4600,7 @@ void            CompAssLVar (
     else {
         //Emit( "%c = %c;\n", CVAR_LVAR(lvar), rhs );
         Emit( "\"%s\"", NAME_LVAR(lvar));
-        SetInfoCVar( CVAR_LVAR(lvar), GetInfoCVar( rhs ) );
+//        SetInfoCVar( CVAR_LVAR(lvar), GetInfoCVar( rhs ) );
     }
 
     /* free the temporary                                                  */
@@ -5763,7 +5588,7 @@ void CompFunc (
 
 /****************************************************************************
 **
-*F  CompileFunc( <output>, <func>, <name>, <magic1>, <magic2> ) . . . compile
+*F  CompileFunc( <output>, <func>, <name> ) . . . compile
 */
 Int CompileFunc (
     Char *              output,
