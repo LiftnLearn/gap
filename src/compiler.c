@@ -305,50 +305,50 @@ void            SetInfoCVar (
     CVar                cvar,
     UInt                type )
 {
-//    Bag                 info;           /* its info bag                    */
-//
-//    /* get the information bag                                             */
-//    info = INFO_FEXP( CURR_FUNC );
-//
-//    /* set the type of a temporary                                         */
-//    if ( IS_TEMP_CVAR(cvar) ) {
-//        TNUM_TEMP_INFO( info, TEMP_CVAR(cvar) ) = type;
-//    }
-//
-//    /* set the type of a lvar (but do not change if its a higher variable) */
-//    else if ( IS_LVAR_CVAR(cvar)
-//           && TNUM_LVAR_INFO( info, LVAR_CVAR(cvar) ) != W_HIGHER ) {
-//        TNUM_LVAR_INFO( info, LVAR_CVAR(cvar) ) = type;
-//    }
+    Bag                 info;           /* its info bag                    */
+
+    /* get the information bag                                             */
+    info = INFO_FEXP( CURR_FUNC );
+
+    /* set the type of a temporary                                         */
+    if ( IS_TEMP_CVAR(cvar) ) {
+        TNUM_TEMP_INFO( info, TEMP_CVAR(cvar) ) = type;
+    }
+
+    /* set the type of a lvar (but do not change if its a higher variable) */
+    else if ( IS_LVAR_CVAR(cvar)
+           && TNUM_LVAR_INFO( info, LVAR_CVAR(cvar) ) != W_HIGHER ) {
+        TNUM_LVAR_INFO( info, LVAR_CVAR(cvar) ) = type;
+    }
 }
 
 Int             GetInfoCVar (
     CVar                cvar )
 {
-//    Bag                 info;           /* its info bag                    */
-//
-//    /* get the information bag                                             */
-//    info = INFO_FEXP( CURR_FUNC );
-//
-//    /* get the type of an integer                                          */
-//    if ( IS_INTG_CVAR(cvar) ) {
-//        return ((0 < INTG_CVAR(cvar)) ? W_INT_SMALL_POS : W_INT_SMALL);
-//    }
-//
-//    /* get the type of a temporary                                         */
-//    else if ( IS_TEMP_CVAR(cvar) ) {
-//        return TNUM_TEMP_INFO( info, TEMP_CVAR(cvar) );
-//    }
-//
-//    /* get the type of a lvar                                              */
-//    else if ( IS_LVAR_CVAR(cvar) ) {
-//        return TNUM_LVAR_INFO( info, LVAR_CVAR(cvar) );
-//    }
-//
-//    /* hmm, avoid warning by compiler                                      */
-//    else {
-//        return 0;
-//    }
+    Bag                 info;           /* its info bag                    */
+
+    /* get the information bag                                             */
+    info = INFO_FEXP( CURR_FUNC );
+
+    /* get the type of an integer                                          */
+    if ( IS_INTG_CVAR(cvar) ) {
+        return ((0 < INTG_CVAR(cvar)) ? W_INT_SMALL_POS : W_INT_SMALL);
+    }
+
+    /* get the type of a temporary                                         */
+    else if ( IS_TEMP_CVAR(cvar) ) {
+        return TNUM_TEMP_INFO( info, TEMP_CVAR(cvar) );
+    }
+
+    /* get the type of a lvar                                              */
+    else if ( IS_LVAR_CVAR(cvar) ) {
+        return TNUM_LVAR_INFO( info, LVAR_CVAR(cvar) );
+    }
+
+    /* hmm, avoid warning by compiler                                      */
+    else {
+        return 0;
+    }
 }
 
 Int             HasInfoCVar (
@@ -690,7 +690,7 @@ void            CompSetUseRNam (
     RNam                rnam,
     UInt                mode )
 {
-    Emit( "\"%s\"", NAME_RNAM(rnam) );
+//    Emit( "\"(CompSetUseRNam) RNAME_SET: %s\"", NAME_RNAM(rnam) );
 
     /* only mark in pass 1                                                 */
     if ( CompPass != 1 )  return;
@@ -746,7 +746,8 @@ char* escapeWhitespace(char* str) {
                 ++j;
                 *j = 't';
             } else {
-              fprintf(stderr, "ERROR: unknown escape sequence in compiler.c, escapeWhitespace\n");
+              fprintf(stderr, "ERROR: unknown escape sequence in " 
+                              "compiler.c, escapeWhitespace\n"    );
             }
         } else {
             *j = *p;
@@ -905,9 +906,6 @@ CVar (* CompExprFuncs[256]) ( Expr expr );
 CVar CompExpr (
     Expr                expr )
 {
-    //findme
-//    printf("%d ",  T_ISB_GVAR);
-//    Emit("%d\n", TNUM_EXPR(expr));
     return (* CompExprFuncs[ TNUM_EXPR(expr) ])( expr );
 }
 
@@ -1437,13 +1435,13 @@ CVar CompEq (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'Eq', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"Eq\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -2979,6 +2977,7 @@ void            CompRecExpr2 (
         tmp = ADDR_EXPR(expr)[2*i-2];
         rnam = CVAR_TEMP( NewTemp( "rnam" ) );
         if ( IS_INTEXPR(tmp) ) {
+            Emit("\"%s\"", NAME_RNAM((UInt)INT_INTEXPR(tmp)));
             CompSetUseRNam( (UInt)INT_INTEXPR(tmp), COMP_USE_RNAM_ID );
            // Emit( "%c = (Obj)R_%n;\n",
            //       rnam, NAME_RNAM((UInt)INT_INTEXPR(tmp)) );
@@ -3402,6 +3401,8 @@ CVar CompIsbList (
     CVar                list;           /* list                            */
     CVar                pos;            /* position                        */
 
+    Emit("CompIsbList");
+
     /* allocate a new temporary for the result                             */
     isb = CVAR_TEMP( NewTemp( "isb" ) );
 
@@ -3438,18 +3439,25 @@ CVar CompElmRecName (
     CVar                record;         /* the record, left operand        */
     UInt                rnam;           /* the name, right operand         */
 
+    Emit("{ \"type\":\"CompElmRecName\", \"record\":");
+
     /* allocate a new temporary for the element                            */
     elm = CVAR_TEMP( NewTemp( "elm" ) );
 
     /* compile the record expression (checking is done by 'ELM_REC')       */
     record = CompExpr( ADDR_EXPR(expr)[0] );
 
+    Emit(", \"name\":");
+
     /* get the name (stored immediately in the expression)                 */
     rnam = (UInt)(ADDR_EXPR(expr)[1]);
+    Emit("\"%s\"", NAME_RNAM(rnam));
     CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
     /* emit the code to select the element of the record                   */
     //Emit( "%c = ELM_REC( %c, R_%n );\n", elm, record, NAME_RNAM(rnam) );
+
+    Emit("}");
 
     /* we know that we have a value                                        */
     SetInfoCVar( elm, W_BOUND );
@@ -3472,6 +3480,8 @@ CVar CompElmRecExpr (
     CVar                elm;            /* element, result                 */
     CVar                record;         /* the record, left operand        */
     CVar                rnam;           /* the name, right operand         */
+
+    Emit("CompElmRecExpr");
 
     /* allocate a new temporary for the element                            */
     elm = CVAR_TEMP( NewTemp( "elm" ) );
@@ -3508,14 +3518,19 @@ CVar CompIsbRecName (
     CVar                record;         /* the record, left operand        */
     UInt                rnam;           /* the name, right operand         */
 
+    Emit("{ \"type\":\"CompIsbRecName\", \"record\":");
+
     /* allocate a new temporary for the result                             */
     isb = CVAR_TEMP( NewTemp( "isb" ) );
 
     /* compile the record expression (checking is done by 'ISB_REC')       */
     record = CompExpr( ADDR_EXPR(expr)[0] );
 
+    Emit(", \"name\":");
+
     /* get the name (stored immediately in the expression)                 */
     rnam = (UInt)(ADDR_EXPR(expr)[1]);
+    Emit("\"%s\"", NAME_RNAM(rnam));
     CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
     /* emit the code to test the element                                   */
@@ -3527,6 +3542,8 @@ CVar CompIsbRecName (
 
     /* free the temporaries                                                */
     if ( IS_TEMP_CVAR( record ) )  FreeTemp( TEMP_CVAR( record ) );
+
+    Emit("}");
 
     /* return the result                                                   */
     return isb;
@@ -3543,6 +3560,8 @@ CVar CompIsbRecExpr (
     CVar                isb;            /* isbound, result                 */
     CVar                record;         /* the record, left operand        */
     CVar                rnam;           /* the name, right operand         */
+
+    Emit("CompIsbRecExpr");
 
     /* allocate a new temporary for the result                             */
     isb = CVAR_TEMP( NewTemp( "isb" ) );
@@ -3657,6 +3676,8 @@ CVar CompIsbPosObj (
     CVar                list;           /* list                            */
     CVar                pos;            /* position                        */
 
+    Emit("CompIsbPosObj");
+
     /* allocate a new temporary for the result                             */
     isb = CVAR_TEMP( NewTemp( "isb" ) );
 
@@ -3714,6 +3735,7 @@ CVar CompElmComObjName (
 
     /* get the name (stored immediately in the expression)                 */
     rnam = (UInt)(ADDR_EXPR(expr)[1]);
+    Emit("\"%s\"", NAME_RNAM(rnam));
     CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
     Emit("}");
@@ -3751,6 +3773,8 @@ CVar CompElmComObjExpr (
     CVar                elm;            /* element, result                 */
     CVar                record;         /* the record, left operand        */
     CVar                rnam;           /* the name, right operand         */
+
+    Emit("CompElmComObjExpr");
 
     /* allocate a new temporary for the element                            */
     elm = CVAR_TEMP( NewTemp( "elm" ) );
@@ -3795,15 +3819,22 @@ CVar CompIsbComObjName (
     CVar                record;         /* the record, left operand        */
     UInt                rnam;           /* the name, right operand         */
 
+    Emit("{\"type\":\"CompIsbComObjName\", \"record\":");
+
     /* allocate a new temporary for the result                             */
     isb = CVAR_TEMP( NewTemp( "isb" ) );
 
     /* compile the record expression (checking is done by 'ISB_REC')       */
     record = CompExpr( ADDR_EXPR(expr)[0] );
 
+    Emit(", \"name\":");
+
     /* get the name (stored immediately in the expression)                 */
     rnam = (UInt)(ADDR_EXPR(expr)[1]);
+    Emit("\"%s\"", NAME_RNAM(rnam));
     CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
+
+    Emit("}");
 
     /* emit the code to test the element                                   */
     //Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
@@ -3840,6 +3871,8 @@ CVar CompIsbComObjExpr (
     CVar                isb;            /* isbound, result                 */
     CVar                record;         /* the record, left operand        */
     UInt                rnam;           /* the name, right operand         */
+
+    Emit("CompIsbComObjExpr");
 
     /* allocate a new temporary for the result                             */
     isb = CVAR_TEMP( NewTemp( "isb" ) );
@@ -3930,26 +3963,7 @@ void CompProccall0to6Args (
     UInt                narg;           /* number of arguments             */
     UInt                i;              /* loop variable                   */
 
-        Emit( "{ \"type\":\"functionCall\", \"name\":");
-//        Emit( "AssGVar( G_%n, 0 );\n", NameGVar(gvar) );
-
-    /* special case to inline 'Add'                                        */
-    if ( CompFastListFuncs
-      && TNUM_EXPR( FUNC_CALL(stat) ) == T_REF_GVAR
-      && ADDR_EXPR( FUNC_CALL(stat) )[0] == G_Add
-      && NARG_SIZE_CALL(SIZE_EXPR(stat)) == 2 ) {
-        args[1] = CompExpr( ARGI_CALL(stat,1) );
-        args[2] = CompExpr( ARGI_CALL(stat,2) );
-        if ( CompFastPlainLists ) {
-            //Emit( "C_ADD_LIST_FPL( %c, %c )\n", args[1], args[2] );
-        }
-        else {
-            //Emit( "C_ADD_LIST( %c, %c )\n", args[1], args[2] );
-        }
-        if ( IS_TEMP_CVAR( args[2] ) )  FreeTemp( TEMP_CVAR( args[2] ) );
-        if ( IS_TEMP_CVAR( args[1] ) )  FreeTemp( TEMP_CVAR( args[1] ) );
-        return;
-    }
+    Emit( "{ \"type\":\"functionCall\", \"name\":");
 
     /* compile the reference to the function                               */
     if ( TNUM_EXPR( FUNC_CALL(stat) ) == T_REF_GVAR ) {
@@ -3957,9 +3971,7 @@ void CompProccall0to6Args (
 //        Emit("%s", NAME_FUNC( FUNC_CALL(stat) ));
     }
     else {
-        printf("not global");
         func = CompExpr( FUNC_CALL(stat) );
-        //CompCheckFunc( func );
     }
 
     Emit(", \"args\":[");
@@ -3972,12 +3984,6 @@ void CompProccall0to6Args (
             Emit( ", " );
         }
     }
-
-    /* emit the code for the procedure call                                */
-    //Emit( "CALL_%dARGS( %c", narg, func );
-    //for ( i = 1; i <= narg; i++ ) {
-        //Emit( ", %c", args[i] );
-    //}
 
     Emit( "]}" );
 
@@ -4267,24 +4273,24 @@ void CompFor (
             last = elm;
         }
 
-        /* find the invariant temp-info                                    */
-        pass = CompPass;
-        CompPass = 99;
-        prev = NewInfoCVars();
-        do {
-            CopyInfoCVars( prev, INFO_FEXP(CURR_FUNC) );
-            if ( HasInfoCVar( first, W_INT_SMALL_POS ) ) {
-                SetInfoCVar( CVAR_LVAR(var), W_INT_SMALL_POS );
-            }
-            else {
-                SetInfoCVar( CVAR_LVAR(var), W_INT_SMALL );
-            }
-            //TODO: what is this? why is this loop compiled twice?
-            for ( i = 2; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
-                CompStat( ADDR_STAT(stat)[i] );
-            }
-            MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
-        } while ( ! IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
+        ///* find the invariant temp-info                                    */
+        //pass = CompPass;
+        //CompPass = 99;
+        //prev = NewInfoCVars();
+        //do {
+        //    CopyInfoCVars( prev, INFO_FEXP(CURR_FUNC) );
+        //    if ( HasInfoCVar( first, W_INT_SMALL_POS ) ) {
+        //        SetInfoCVar( CVAR_LVAR(var), W_INT_SMALL_POS );
+        //    }
+        //    else {
+        //        SetInfoCVar( CVAR_LVAR(var), W_INT_SMALL );
+        //    }
+        //    //TODO: what is this? why is this loop compiled twice?
+        //    for ( i = 2; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
+        //        CompStat( ADDR_STAT(stat)[i] );
+        //    }
+        //    MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
+        //} while ( ! IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
         CompPass = pass;
 
         /* emit the code for the loop                                      */
@@ -4304,9 +4310,12 @@ void CompFor (
             SetInfoCVar( CVAR_LVAR(var), W_INT_SMALL );
         }
 
-        Emit(", \"do\":");
+        Emit(", \"do\":[");
         /* compile the body                                                */
         for ( i = 2; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
+            if(i > 2) {
+                Emit(",");
+            }
             CompStat( ADDR_STAT(stat)[i] );
         }
 
@@ -4380,21 +4389,21 @@ void CompFor (
           }
         /* end of SL patch */
 
-        /* find the invariant temp-info                                    */
-        pass = CompPass;
-        CompPass = 99;
-        prev = NewInfoCVars();
-        do {
-            CopyInfoCVars( prev, INFO_FEXP(CURR_FUNC) );
-            if ( vart == 'l' ) {
-                SetInfoCVar( CVAR_LVAR(var), W_BOUND );
-            }
-            for ( i = 2; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
-                CompStat( ADDR_STAT(stat)[i] );
-            }
-            MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
-        } while ( ! IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
-        CompPass = pass;
+        ///* find the invariant temp-info                                    */
+        //pass = CompPass;
+        //CompPass = 99;
+        //prev = NewInfoCVars();
+        //do {
+        //    CopyInfoCVars( prev, INFO_FEXP(CURR_FUNC) );
+        //    if ( vart == 'l' ) {
+        //        SetInfoCVar( CVAR_LVAR(var), W_BOUND );
+        //    }
+        //    for ( i = 2; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
+        //        CompStat( ADDR_STAT(stat)[i] );
+        //    }
+        //    MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
+        //} while ( ! IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
+        //CompPass = pass;
 
 
         /* emit the code to copy the loop index into the loop variable     */
@@ -4420,10 +4429,13 @@ void CompFor (
             SetInfoCVar( CVAR_LVAR(var), W_BOUND );
         }
 
-        Emit(", \"do\":");
+        Emit(", \"do\":[");
 
         /* compile the body                                                */
         for ( i = 2; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
+            if(i > 2) {
+                Emit(",");
+            }
             CompStat( ADDR_STAT(stat)[i] );
         }
 
@@ -4434,7 +4446,7 @@ void CompFor (
         if ( IS_TEMP_CVAR( lidx   ) )  FreeTemp( TEMP_CVAR( lidx   ) );
     }
   
-    Emit( "}" );
+    Emit( "]}" );
 }
 
 
@@ -4452,22 +4464,22 @@ void CompWhile (
 
     /* find an invariant temp-info                                         */
     /* the emits are probably not needed                                   */
-    pass = CompPass;
-    CompPass = 99;
-    //Emit( "while ( 1 ) {\n" );
-    prev = NewInfoCVars();
-    do {
-        CopyInfoCVars( prev, INFO_FEXP(CURR_FUNC) );
-        cond = CompBoolExpr( ADDR_STAT(stat)[0] );
-        //Emit( "if ( ! %c ) break;\n", cond );
-        if ( IS_TEMP_CVAR( cond ) )  FreeTemp( TEMP_CVAR( cond ) );
-        for ( i = 1; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
-            CompStat( ADDR_STAT(stat)[i] );
-        }
-        MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
-    } while ( ! IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
-    //Emit( "}\n" );
-    CompPass = pass;
+    //pass = CompPass;
+    //CompPass = 99;
+    ////Emit( "while ( 1 ) {\n" );
+    //prev = NewInfoCVars();
+    //do {
+    //    CopyInfoCVars( prev, INFO_FEXP(CURR_FUNC) );
+    //    cond = CompBoolExpr( ADDR_STAT(stat)[0] );
+    //    //Emit( "if ( ! %c ) break;\n", cond );
+    //    if ( IS_TEMP_CVAR( cond ) )  FreeTemp( TEMP_CVAR( cond ) );
+    //    for ( i = 1; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
+    //        CompStat( ADDR_STAT(stat)[i] );
+    //    }
+    //    MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
+    //} while ( ! IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
+    ////Emit( "}\n" );
+    //CompPass = pass;
 
     Emit( "{\"type\":\"while\", \"cond\":" );
 
@@ -4508,22 +4520,22 @@ void CompRepeat (
     Bag                 prev;           /* previous temp-info              */
     UInt                i;              /* loop variable                   */
 
-    /* find an invariant temp-info                                         */
-    /* the emits are probably not needed                                   */
-    pass = CompPass;
-    CompPass = 99;
-    //Emit( "do {\n" );
-    prev = NewInfoCVars();
-    do {
-        CopyInfoCVars( prev, INFO_FEXP(CURR_FUNC) );
-        for ( i = 1; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
-            CompStat( ADDR_STAT(stat)[i] );
-        }
-        cond = CompBoolExpr( ADDR_STAT(stat)[0] );
-        if ( IS_TEMP_CVAR( cond ) )  FreeTemp( TEMP_CVAR( cond ) );
-        MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
-    } while ( ! IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
-    CompPass = pass;
+    ///* find an invariant temp-info                                         */
+    ///* the emits are probably not needed                                   */
+    //pass = CompPass;
+    //CompPass = 99;
+    ////Emit( "do {\n" );
+    //prev = NewInfoCVars();
+    //do {
+    //    CopyInfoCVars( prev, INFO_FEXP(CURR_FUNC) );
+    //    for ( i = 1; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
+    //        CompStat( ADDR_STAT(stat)[i] );
+    //    }
+    //    cond = CompBoolExpr( ADDR_STAT(stat)[0] );
+    //    if ( IS_TEMP_CVAR( cond ) )  FreeTemp( TEMP_CVAR( cond ) );
+    //    MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
+    //} while ( ! IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
+    //CompPass = pass;
     
 
     Emit("{\"type\":\"repeat\", \"do\":[");
@@ -5006,7 +5018,8 @@ void CompAssRecName (
     Emit(", 'name':");
     /* get the name (stored immediately in the statement)                  */
     rnam = (UInt)(ADDR_STAT(stat)[1]);
-    CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
+    Emit("\"%s\"", NAME_RNAM(rnam));
+    //CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
     Emit(", 'rightHandSide':");
     /* compile the right hand side                                         */
@@ -5081,6 +5094,7 @@ void CompUnbRecName (
     Emit(", 'rnam':");
     /* get the name (stored immediately in the statement)                  */
     rnam = (UInt)(ADDR_STAT(stat)[1]);
+    Emit("\"%s\"", NAME_RNAM(rnam));
     CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
     /* emit the code for the assignment                                    */
@@ -5293,6 +5307,7 @@ void CompAssComObjName (
     Emit(", 'rnam':");
     /* get the name (stored immediately in the statement)                  */
     rnam = (UInt)(ADDR_STAT(stat)[1]);
+    Emit("\"%s\"", NAME_RNAM(rnam));
     CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
     Emit(", 'rhs':");
@@ -5385,6 +5400,7 @@ void CompUnbComObjName (
     Emit(", 'rnam':");
     /* get the name (stored immediately in the statement)                  */
     rnam = (UInt)(ADDR_STAT(stat)[1]);
+    Emit("\"%s\"", NAME_RNAM(rnam));
     CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
     Emit("}");
@@ -5425,6 +5441,7 @@ void CompUnbComObjExpr (
     Emit(", 'rnam':");
     /* get the name (stored immediately in the statement)                  */
     rnam = CompExpr( ADDR_STAT(stat)[1] );
+    Emit("\"%s\"", NAME_RNAM(rnam));
     CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
     Emit("}");
@@ -5453,7 +5470,7 @@ void CompEmpty (
     Stat                stat )
 {
   //Emit("\n/* ; */\n");
-  //Emit(";");
+  Emit("{\"type\":\"empty\"}");
 }
   
 /****************************************************************************
@@ -5470,16 +5487,30 @@ void CompInfo (
     Int                 narg;
     Int                 i;
 
+
+    Emit("{\"type\":\"Info\", \"sel\":");
+
     sel = CompExpr( ARGI_INFO( stat, 1 ) );
+
+    Emit(", \"lev\":");
+
     lev = CompExpr( ARGI_INFO( stat, 2 ) );
+
+    Emit(", \"args\":[");
+
     lst = CVAR_TEMP( NewTemp( "lst" ) );
     tmp = CVAR_TEMP( NewTemp( "tmp" ) );
     if ( IS_TEMP_CVAR( tmp ) )  FreeTemp( TEMP_CVAR( tmp ) );
     narg = NARG_SIZE_INFO(SIZE_STAT(stat))-2;
     for ( i = 1;  i <= narg;  i++ ) {
         tmp = CompExpr( ARGI_INFO( stat, i+2 ) );
+        if( i < narg) {
+            Emit(",");
+        }
         if ( IS_TEMP_CVAR( tmp ) )  FreeTemp( TEMP_CVAR( tmp ) );
     }
+
+    Emit("]}");
 
     /* free the temporaries                                                */
     if ( IS_TEMP_CVAR( lst ) )  FreeTemp( TEMP_CVAR( lst ) );
@@ -5597,6 +5628,14 @@ void CompFunc (
 
     /* get the info bag                                                    */
     info = INFO_FEXP( CURR_FUNC );
+    
+//    Int pass = CompPass;
+//    CompPass = 99;
+//    fexs = FEXS_FUNC(func);
+//    for ( i = 1;  i <= LEN_PLIST(fexs);  i++ ) {
+//        CompFunc( ELM_PLIST( fexs, i ) );
+//    }
+//    CompPass = pass;
 
     for ( i = 1; i <= narg; i++ ) {
         Emit("\"%s\"", NAME_LVAR(i));
@@ -5607,6 +5646,8 @@ void CompFunc (
 
     Emit("], \"body\":");
  
+    /* compile the body                                                    */
+    CompStat( FIRST_STAT_CURR_FUNC );
 
     /* we know all the arguments have values                               */
     for ( i = 1; i <= narg; i++ ) {
@@ -5615,10 +5656,7 @@ void CompFunc (
     for ( i = narg+1; i <= narg+nloc; i++ ) {
         SetInfoCVar( CVAR_LVAR(i), W_UNBOUND );
     }
-
-    /* compile the body                                                    */
-    CompStat( FIRST_STAT_CURR_FUNC );
-
+    
     /* switch back to old frame                                            */
     SWITCH_TO_OLD_LVARS( oldFrame );
   
