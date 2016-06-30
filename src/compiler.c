@@ -730,7 +730,7 @@ UInt            CompGetUseRNam (
 */
 char* escapeWhitespace(char* str) {
     //allocate new output string
-    char* newStr = (char*) malloc(sizeof(char) * strlen(str) * 2);
+    char* newStr = (char*) malloc(sizeof(char) * strlen(str) * 5); //TODO: set this back to 2 after redundant \ is removed
     
     char* p, *j;
     for(p = str, j = newStr; *p != '\0'; ++j, ++p) {
@@ -745,18 +745,56 @@ char* escapeWhitespace(char* str) {
                 *j = '\\';
                 ++j;
                 *j = 't';
-            } else if(*p == '\b') {
+            } else if(*p == '\r') {
                 *j = '\\';
                 ++j;
-                *j = 'b';
+                *j = 'r';
             } else {
               fprintf(stderr, "ERROR: unknown escape sequence in " 
                               "compiler.c, escapeWhitespace: %d\n", *p);
             }
+        } else if(*p == '\b') {
+                *j = '\\';
+                ++j;
+                *j = 'b';
+        } else if(*p == '\\') {
+            *j = '\\';
+            ++j;
+            *j = '\\';
         } else if(*p == '\"') {
             *j = '\\';
             ++j;
             *j = '\"';
+        } else if(*p == '\01') {
+            *j = '\\';
+            ++j;
+            *j = '\\';
+            ++j;
+            *j = '>';
+        } else if(*p == '\02') {
+            *j = '\\';
+            ++j;
+            *j = '\\'; //TODO: this is one too much but otherwise the most prettifiers crash
+            ++j;
+            *j = '<';
+        } else if(*p == '\03') {
+            *j = '\\';
+            ++j;
+            *j = '\\';
+            ++j;
+            *j = 'c';
+        } else if(!isprint(*p)) {
+           // *j = '\\'; //TODO: remove
+           // ++j;
+           // *j = '\\';
+           // ++j;
+           // *j = '0';
+           // ++j;
+           // *j = '3';
+           // ++j;
+           // *j = '3';
+           sprintf(j, "\\%03x"); //TODO: maybe use snprintf?
+           j += 3;
         } else {
             *j = *p;
         }
@@ -2682,7 +2720,7 @@ CVar CompListTildeExpr (
     CVar                list;           /* list value, result              */
     CVar                tilde;          /* old value of tilde              */
 
-    Emit("~");
+    Emit("{ \"type\":\"ListTilde\", \"list\":");
 
     /* remember the old value of '~'                                       */
     tilde = CVAR_TEMP( NewTemp( "tilde" ) );
@@ -2700,6 +2738,8 @@ CVar CompListTildeExpr (
     /* restore old value of '~'                                            */
     //Emit( "AssGVar( Tilde, %c );\n", tilde );
     if ( IS_TEMP_CVAR( tilde ) )  FreeTemp( TEMP_CVAR( tilde ) );
+
+    Emit("}");
 
     /* return the list value                                               */
     return list;
@@ -2916,7 +2956,7 @@ CVar CompRecTildeExpr (
     CVar                rec;            /* record value, result            */
     CVar                tilde;          /* old value of tilde              */
 
-    Emit("~");
+    Emit("{ \"type\":\"RecordTilde\", \"record\":");
 
     /* remember the old value of '~'                                       */
     tilde = CVAR_TEMP( NewTemp( "tilde" ) );
@@ -2934,6 +2974,8 @@ CVar CompRecTildeExpr (
     /* restore the old value of '~'                                        */
     //Emit( "AssGVar( Tilde, %c );\n", tilde );
     if ( IS_TEMP_CVAR( tilde ) )  FreeTemp( TEMP_CVAR( tilde ) );
+
+    Emit("}");
 
     /* return the record value                                             */
     return rec;
@@ -3410,7 +3452,7 @@ CVar CompElmsListLev (
     CVar                poss;           /* positions                       */
     Int                 level;          /* level                           */
 
-    Emit("\"type\":\"ElmsListLev\", \"list\":");
+    Emit("{ \"type\":\"ElmsListLev\", \"list\":");
 
     /* compile the lists expression                                        */
     lists = CompExpr( ADDR_EXPR(expr)[0] );
@@ -3420,10 +3462,10 @@ CVar CompElmsListLev (
     /* compile the position expression (checking done by 'ElmsListLevel')  */
     poss = CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit(", \"level\":");
-
     /* get the level                                                       */
     level = (Int)(ADDR_EXPR(expr)[2]);
+
+    Emit(", \"level\":%d", level);
 
     Emit("}");
 
@@ -3735,7 +3777,7 @@ CVar CompIsbPosObj (
     CVar                list;           /* list                            */
     CVar                pos;            /* position                        */
 
-    Emit("CompIsbPosObj");
+    Emit("{ \"type\":\"CompIsbPosObj\", \"list\":");
 
     /* allocate a new temporary for the result                             */
     isb = CVAR_TEMP( NewTemp( "isb" ) );
@@ -3743,9 +3785,13 @@ CVar CompIsbPosObj (
     /* compile the list expression (checking is done by 'ISB_LIST')        */
     list = CompExpr( ADDR_EXPR(expr)[0] );
 
+    Emit(", \"pos\":");
+
     /* compile and check the position expression                           */
     pos = CompExpr( ADDR_EXPR(expr)[1] );
     CompCheckIntSmallPos( pos );
+
+    Emit("}");
 
     /* emit the code to test the element                                   */
     //Emit( "if ( TNUM_OBJ(%c) == T_POSOBJ ) {\n", list );
@@ -3833,16 +3879,22 @@ CVar CompElmComObjExpr (
     CVar                record;         /* the record, left operand        */
     CVar                rnam;           /* the name, right operand         */
 
-    Emit("CompElmComObjExpr");
+    Emit("{ \"type\":\"CompElmComObjExpr\", ");
 
     /* allocate a new temporary for the element                            */
     elm = CVAR_TEMP( NewTemp( "elm" ) );
 
+    Emit("\"record\":");
+
     /* compile the record expression (checking is done by 'ELM_REC')       */
     record = CompExpr( ADDR_EXPR(expr)[0] );
 
+    Emit(", \"name\":");
+
     /* get the name (stored immediately in the expression)                 */
     rnam = CompExpr( ADDR_EXPR(expr)[1] );
+
+    Emit("}");
 
     /* emit the code to select the element of the record                   */
     //Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
@@ -3931,7 +3983,7 @@ CVar CompIsbComObjExpr (
     CVar                record;         /* the record, left operand        */
     UInt                rnam;           /* the name, right operand         */
 
-    Emit("CompIsbComObjExpr");
+    Emit("{ \"type\":\"CompIsbComObjExpr\", \"record\":");
 
     /* allocate a new temporary for the result                             */
     isb = CVAR_TEMP( NewTemp( "isb" ) );
@@ -3939,8 +3991,12 @@ CVar CompIsbComObjExpr (
     /* compile the record expression (checking is done by 'ISB_REC')       */
     record = CompExpr( ADDR_EXPR(expr)[0] );
 
+    Emit(", \"name\":");
+
     /* get the name (stored immediately in the expression)                 */
     rnam = CompExpr( ADDR_EXPR(expr)[1] );
+
+    Emit("}");
 
     /* emit the code to test the element                                   */
     //Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
@@ -4067,7 +4123,7 @@ void CompProccallXArgs (
     UInt                narg;           /* number of arguments             */
     UInt                i;              /* loop variable                   */
 
-    Emit( "{ \"type\":\"functionCall\", \"args\":" );
+    Emit( "{ \"type\":\"functionCall\", \"function\":" );
 
     /* compile the reference to the function                               */
     if ( TNUM_EXPR( FUNC_CALL(stat) ) == T_REF_GVAR ) {
@@ -4077,6 +4133,8 @@ void CompProccallXArgs (
         func = CompExpr( FUNC_CALL(stat) );
         CompCheckFunc( func );
     }
+
+    Emit(",\"args\":[");
 
     /* compile the argument expressions                                    */
     narg = NARG_SIZE_CALL(SIZE_STAT(stat));
@@ -4096,7 +4154,7 @@ void CompProccallXArgs (
         }
     }
 
-    Emit( "}" );
+    Emit( "]}" );
 
     /* emit the code for the procedure call                                */
     //Emit( "CALL_XARGS( %c, %c );\n", func, argl );
@@ -4113,7 +4171,7 @@ void CompProccallXArgs (
 void CompProccallOpts(
                       Stat stat)
 {
-  Emit("<!-- in CompProccallOpts !-->");
+  Emit("{ \"type\":\"ProccallOpts\", \"opts\":");
   CVar opts = CompExpr(ADDR_STAT(stat)[0]);
   GVar pushOptions;
   GVar popOptions;
@@ -4123,8 +4181,10 @@ void CompProccallOpts(
   CompSetUseGVar(popOptions, COMP_USE_GVAR_FOPY);
   //Emit("CALL_1ARGS( GF_PushOptions, %c );\n", opts);
   if (IS_TEMP_CVAR( opts) ) FreeTemp( TEMP_CVAR( opts ));
+  Emit(", \"proc\":");
   CompStat(ADDR_STAT(stat)[1]);
   //Emit("CALL_0ARGS( GF_PopOptions );\n");
+  Emit("}");
 }
      
 
@@ -4850,7 +4910,7 @@ void            CompUnbGVar (
 
     /* emit the code for the assignment                                    */
     gvar = (GVar)(ADDR_STAT(stat)[0]);
-    Emit( ", \"gvar\":\"%s\"", NameGVar(gvar));
+    Emit( "\"gvar\":\"%s\"", NameGVar(gvar));
     CompSetUseGVar( gvar, COMP_USE_GVAR_ID );
     //Emit( "AssGVar( G_%n, 0 );\n", NameGVar(gvar) );
     
@@ -5421,7 +5481,7 @@ void CompAssComObjExpr (
     /* compile the record expression                                       */
     record = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit( ", \"rnam\":" );
+    Emit( ", \"name\":" );
     /* get the name (stored immediately in the statement)                  */
     rnam = CompExpr( ADDR_STAT(stat)[1] );
 
@@ -5466,11 +5526,12 @@ void CompUnbComObjName (
     /* compile the record expression                                       */
     record = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", \"rnam\":");
+    Emit(", \"name\":");
     /* get the name (stored immediately in the statement)                  */
     rnam = (UInt)(ADDR_STAT(stat)[1]);
-    Emit("\"%s\"", NAME_RNAM(rnam));
     CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
+
+    Emit("\"%s\"", NAME_RNAM(rnam));
 
     Emit("}");
 
@@ -5507,11 +5568,12 @@ void CompUnbComObjExpr (
     /* compile the record expression                                       */
     record = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", \"rnam\":");
+    Emit(", \"name\":");
     /* get the name (stored immediately in the statement)                  */
     rnam = CompExpr( ADDR_STAT(stat)[1] );
-    Emit("\"%s\"", NAME_RNAM(rnam));
     CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
+
+    //Emit("\"%s\"", NAME_RNAM(rnam));
 
     Emit("}");
 
