@@ -745,10 +745,18 @@ char* escapeWhitespace(char* str) {
                 *j = '\\';
                 ++j;
                 *j = 't';
+            } else if(*p == '\b') {
+                *j = '\\';
+                ++j;
+                *j = 'b';
             } else {
               fprintf(stderr, "ERROR: unknown escape sequence in " 
-                              "compiler.c, escapeWhitespace\n"    );
+                              "compiler.c, escapeWhitespace: %d\n", *p);
             }
+        } else if(*p == '\"') {
+            *j = '\\';
+            ++j;
+            *j = '\"';
         } else {
             *j = *p;
         }
@@ -918,6 +926,7 @@ CVar CompUnknownExpr (
     Expr                expr )
 {
     //Emit( "CANNOT COMPILE EXPRESSION OF TNUM %d;\n", TNUM_EXPR(expr) );
+    Emit("\"Unknown expression\"");
     return 0;
 }
 
@@ -1045,7 +1054,7 @@ CVar CompFunccallXArgs (
     UInt                narg;           /* number of arguments             */
     UInt                i;              /* loop variable                   */
 
-    Emit("CompFunccallXArgs");
+    Emit("{\"type\":\"FunccallXArgs\", \"function\":");
     /* allocate a temporary for the result                                 */
     result = CVAR_TEMP( NewTemp( "result" ) );
 
@@ -1063,8 +1072,12 @@ CVar CompFunccallXArgs (
     argl = CVAR_TEMP( NewTemp( "argl" ) );
     //Emit( "%c = NEW_PLIST( T_PLIST, %d );\n", argl, narg );
     //Emit( "SET_LEN_PLIST( %c, %d );\n", argl, narg );
+  
+    Emit(", \"args\":[");
+
     for ( i = 1; i <= narg; i++ ) {
         argi = CompExpr( ARGI_CALL( expr, i ) );
+        if(i < narg) { Emit(", ");}
         if ( IS_TEMP_CVAR( argi ) )  FreeTemp( TEMP_CVAR( argi ) );
     }
 
@@ -1073,6 +1086,8 @@ CVar CompFunccallXArgs (
 
     /* emit code for the check (sets the information for the result)       */
     CompCheckFuncResult( result );
+
+    Emit("]}");
 
     /* free the temporaries                                                */
     if ( IS_TEMP_CVAR( argl ) )  FreeTemp( TEMP_CVAR( argl ) );
@@ -1089,8 +1104,9 @@ CVar CompFunccallXArgs (
 CVar CompFunccallOpts(
                       Expr expr)
 {
-  Emit("CompFunccallOpts");
+  Emit("{ \"type\":\"FunccallOpts\", \"opts\":");
   CVar opts = CompExpr(ADDR_STAT(expr)[0]);
+  Emit(", \"result\":");
   GVar pushOptions;
   GVar popOptions;
   CVar result;
@@ -1101,6 +1117,7 @@ CVar CompFunccallOpts(
   //Emit("CALL_1ARGS( GF_PushOptions, %c );\n", opts);
   if (IS_TEMP_CVAR( opts) ) FreeTemp( TEMP_CVAR( opts ));
   result = CompExpr(ADDR_STAT(expr)[1]);
+  Emit("}");
   //Emit("CALL_0ARGS( GF_PopOptions );\n");
   return result;
 }
@@ -1166,8 +1183,8 @@ CVar CompOr (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'or', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"or\", ");
+    Emit("\"left\":");
 
     /* compile the left expression                                         */
     left = CompBoolExpr( ADDR_EXPR(expr)[0] );
@@ -1175,7 +1192,7 @@ CVar CompOr (
     only_left = NewInfoCVars();
     CopyInfoCVars( only_left, INFO_FEXP(CURR_FUNC) );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
 
     /* compile the right expression                                        */
     right = CompBoolExpr( ADDR_EXPR(expr)[1] );
@@ -1212,8 +1229,8 @@ CVar CompOrBool (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
     
-    Emit("{'type':'BoolExpr', 'subtype':'orBool', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"orBool\", ");
+    Emit("\"left\":");
 
     /* compile the left expression                                         */
     left = CompBoolExpr( ADDR_EXPR(expr)[0] );
@@ -1222,7 +1239,7 @@ CVar CompOrBool (
     only_left = NewInfoCVars();
     CopyInfoCVars( only_left, INFO_FEXP(CURR_FUNC) );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
 
     /* compile the right expression                                        */
     right = CompBoolExpr( ADDR_EXPR(expr)[1] );
@@ -1260,15 +1277,15 @@ CVar CompAnd (
     /* allocate a temporary for the result                                 */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'and', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"and\", ");
+    Emit("\"left\":");
 
     /* compile the left expression                                         */
     left = CompExpr( ADDR_EXPR(expr)[0] );
     only_left = NewInfoCVars();
     CopyInfoCVars( only_left, INFO_FEXP(CURR_FUNC) );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
 
     /* emit the code for the case that the left value is 'false'           */
     //Emit( "if ( %c == False ) {\n", left );
@@ -1319,8 +1336,8 @@ CVar CompAndBool (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'andBool', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"andBool\", ");
+    Emit("\"left\":");
 
     /* compile the left expression                                         */
     left = CompBoolExpr( ADDR_EXPR(expr)[0] );
@@ -1329,7 +1346,7 @@ CVar CompAndBool (
     only_left = NewInfoCVars();
     CopyInfoCVars( only_left, INFO_FEXP(CURR_FUNC) );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
 
     /* compile the right expression                                        */
     right = CompBoolExpr( ADDR_EXPR(expr)[1] );
@@ -1364,8 +1381,8 @@ CVar CompNot (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'not', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"not\", ");
+    Emit("\"left\":");
 
     /* compile the operand                                                 */
     left = CompBoolExpr( ADDR_EXPR(expr)[0] );
@@ -1399,8 +1416,8 @@ CVar CompNotBool (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'notBool', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"notBool\", ");
+    Emit("\"left\":");
 
     /* compile the operand                                                 */
     left = CompBoolExpr( ADDR_EXPR(expr)[0] );
@@ -1480,13 +1497,13 @@ CVar CompEqBool (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'EqBool', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"EqBool\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -1525,13 +1542,13 @@ CVar CompNe (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'notEqual', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"notEqual\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -1570,13 +1587,13 @@ CVar CompNeBool (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'notEqualBool', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"notEqualBool\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -1615,13 +1632,13 @@ CVar CompLt (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'lessThan', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"lessThan\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -1660,13 +1677,13 @@ CVar CompLtBool (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'lessThanBool', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"lessThanBool\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -1705,13 +1722,13 @@ CVar CompGe (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'greaterEqual', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"greaterEqual\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -1750,13 +1767,13 @@ CVar CompGeBool (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'greaterEqualBool', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"greaterEqualBool\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -1795,13 +1812,13 @@ CVar CompGt (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'greaterThan', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"greaterThan\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -1840,13 +1857,13 @@ CVar CompGtBool (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'greaterThanBool', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"greaterThanBool\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -1885,13 +1902,13 @@ CVar CompLe (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'lessEqual', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"lessEqual\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -1930,13 +1947,13 @@ CVar            CompLeBool (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'lessEqualBool', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"lessEqualBool\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -1975,13 +1992,13 @@ CVar CompIn (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'in', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"in\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -2015,13 +2032,13 @@ CVar CompInBool (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'BoolExpr', 'subtype':'inBool', ");
-    Emit("'left':");
+    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"inBool\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -2107,8 +2124,8 @@ CVar CompAInv (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'arithmetic', 'subtype':'aInv', ");
-    Emit("'left':");
+    Emit("{\"type\":\"arithmetic\", \"subtype\":\"aInv\", ");
+    Emit("\"left\":");
 
     /* compile the operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
@@ -2156,13 +2173,13 @@ CVar CompDiff (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'arithmetic', 'subtype':'diff', ");
-    Emit("'left':");
+    Emit("{\"type\":\"arithmetic\", \"subtype\":\"diff\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -2209,13 +2226,13 @@ CVar CompProd (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'arithmetic', 'subtype':'prod', ");
-    Emit("'left':");
+    Emit("{\"type\":\"arithmetic\", \"subtype\":\"prod\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -2264,8 +2281,8 @@ CVar CompInv (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'arithmetic', 'subtype':'inv', ");
-    Emit("'left':");
+    Emit("{\"type\":\"arithmetic\", \"subtype\":\"inv\", ");
+    Emit("\"left\":");
 
     /* compile the operands                                                */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
@@ -2300,13 +2317,13 @@ CVar CompQuo (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'arithmetic', 'subtype':'quo', ");
-    Emit("'left':");
+    Emit("{\"type\":\"arithmetic\", \"subtype\":\"quo\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -2340,13 +2357,13 @@ CVar CompMod (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'arithmetic', 'subtype':'mod', ");
-    Emit("'left':");
+    Emit("{\"type\":\"arithmetic\", \"subtype\":\"mod\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -2385,13 +2402,13 @@ CVar CompPow (
     /* allocate a new temporary for the result                             */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit("{'type':'arithmetic', 'subtype':'pow', ");
-    Emit("'left':");
+    Emit("{\"type\":\"arithmetic\", \"subtype\":\"pow\", ");
+    Emit("\"left\":");
 
     /* compile the two operands                                            */
     left  = CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", 'right':");
+    Emit(", \"right\":");
     right = CompExpr( ADDR_EXPR(expr)[1] );
 
     Emit("}");
@@ -2494,7 +2511,7 @@ CVar CompTrueExpr (
 
     /* emit the code                                                       */
     //Emit( "%c = True;\n", val );
-    Emit("'true'");
+    Emit("\"true\"");
 
     /* we know that the result is boolean ;-)                              */
     SetInfoCVar( val, W_BOOL );
@@ -2518,7 +2535,7 @@ CVar CompFalseExpr (
 
     /* emit the code                                                       */
     //Emit( "%c = False;\n", val );
-    Emit("'false'");
+    Emit("\"false\"");
 
     /* we know that the result is boolean ;-)                              */
     SetInfoCVar( val, W_BOOL );
@@ -2540,10 +2557,12 @@ CVar            CompCharExpr (
     /* allocate a new temporary for the char value                         */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit(">---Character---<");
+    Emit("{\"type\":\"character\", \"val\":");
 
     /* emit the code                                                       */
     //Emit( "%c = ObjsChar[%d];\n", val, (Int)(((UChar*)ADDR_EXPR(expr))[0]));
+
+    Emit("\"%d\"}", (Int)(((UChar*)ADDR_EXPR(expr))[0]));
 
     /* we know that we have a value                                        */
     SetInfoCVar( val, W_BOUND );
@@ -2570,13 +2589,14 @@ CVar CompPermExpr (
     Int                 csize;
     Expr                cycle;
 
-    Emit("{ 'type':'permutation', 'components':[");
+    Emit("{ \"type\":\"permutation\", \"components\":[");
 
     /* check for the identity                                              */
     if ( SIZE_EXPR(expr) == 0 ) {
         perm = CVAR_TEMP( NewTemp( "idperm" ) );
         //Emit( "%c = IdentityPerm;\n", perm );
         SetInfoCVar( perm, W_BOUND );
+        Emit("]}");
         return perm;
     }
 
@@ -2796,7 +2816,7 @@ CVar CompRangeExpr (
     /* allocate a new temporary for the range                              */
     range = CVAR_TEMP( NewTemp( "range" ) );
 
-    Emit("{ 'type':'range', ");
+    Emit("{ \"type\":\"range\", ");
 
     /* evaluate the expressions                                            */
     if ( SIZE_EXPR(expr) == 2 * sizeof(Expr) ) {
@@ -2807,11 +2827,11 @@ CVar CompRangeExpr (
         last   = CompExpr( ADDR_EXPR(expr)[1] );
     }
     else {
-        Emit("'first':");
+        Emit("\"first\":");
         first  = CompExpr( ADDR_EXPR(expr)[0] );
-        Emit(", 'second':");
+        Emit(", \"second\":");
         second = CompExpr( ADDR_EXPR(expr)[1] );
-        Emit(", 'last':");
+        Emit(", \"last\":");
         last   = CompExpr( ADDR_EXPR(expr)[2] );
     }
     
@@ -2968,7 +2988,7 @@ void            CompRecExpr2 (
     /* get the number of components                                        */
     len = SIZE_EXPR( expr ) / (2*sizeof(Expr));
 
-    Emit("{ 'type':'record', 'components':{");
+    Emit("{ \"type\":\"record\", \"components\":{");
 
     /* handle the subexpressions                                           */
     for ( i = 1; i <= len; i++ ) {
@@ -3057,7 +3077,8 @@ CVar CompRefLVar (
         val = CVAR_LVAR(lvar);
     }
 
-    Emit("\"%s\"", NAME_LVAR(lvar));
+    Emit("{\"type\":\"variable\", \"subtype\":\"RefLVar\"");
+    Emit(", \"identifier\":\"%s\"}", NAME_LVAR(lvar));
 
     /* return the value                                                    */
     return val;
@@ -3077,6 +3098,9 @@ CVar CompIsbLVar (
 
     /* get the local variable                                              */
     lvar = (LVar)(ADDR_EXPR(expr)[0]);
+
+    Emit("{\"type\":\"variable\", \"subtype\":\"isBoundLVar\"");
+    Emit(", \"identifier\":\"%s\"}", NAME_LVAR(lvar));
 
     /* allocate a new temporary for the result                             */
     isb = CVAR_TEMP( NewTemp( "isb" ) );
@@ -3120,7 +3144,8 @@ CVar CompRefHVar (
     /* emit the code to check that the variable has a value                */
     CompCheckBound( val, NAME_HVAR(hvar) );
 
-    Emit("\"%s\"", NAME_HVAR(hvar));
+    Emit("{\"type\":\"variable\", \"subtype\":\"RefHVar\"");
+    Emit(", \"identifier\":\"%s\"}", NAME_HVAR(hvar));
  
     /* return the value                                                    */
     return val;
@@ -3152,6 +3177,9 @@ CVar CompIsbHVar (
     /* free the temporaries                                                */
     if ( IS_TEMP_CVAR( val ) )  FreeTemp( TEMP_CVAR( val ) );
 
+    Emit("{\"type\":\"variable\", \"subtype\":\"isBoundHVar\"");
+    Emit(", \"identifier\":\"%s\"}", NAME_HVAR(hvar));
+
     /* return the result                                                   */
     return isb;
 }
@@ -3174,7 +3202,8 @@ CVar CompRefGVar (
     /* allocate a new global variable for the value                        */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
-    Emit( "\"%s\"", NameGVar(gvar));
+    Emit("{\"type\":\"variable\", \"subtype\":\"RefGVar\"");
+    Emit( ", \"identifier\":\"%s\"}", NameGVar(gvar));
 
     /* emit the code to check that the variable has a value                */
     CompCheckBound( val, NameGVar(gvar) );
@@ -3201,8 +3230,9 @@ CVar CompRefGVarFopy (
     /* allocate a new temporary for the value                              */
     val = CVAR_TEMP( NewTemp( "val" ) );
 
+    Emit("{\"type\":\"variable\", \"subtype\":\"RefGVarFopy\"");
     /* emit name of the global variable                                    */
-    Emit("\"%s\"", NameGVar(gvar));
+    Emit(", \"identifier\":\"%s\"}", NameGVar(gvar));
 
     /* we know that the object in a function copy is a function            */
     SetInfoCVar( val, W_FUNC );
@@ -3226,6 +3256,9 @@ CVar CompIsbGVar (
     /* get the global variable                                             */
     gvar = (GVar)(ADDR_EXPR(expr)[0]);
     CompSetUseGVar( gvar, COMP_USE_GVAR_COPY );
+
+    Emit("{\"type\":\"variable\", \"subtype\":\"isBoundGVar\"");
+    Emit( ", \"identifier\":\"%s\"}", NameGVar(gvar));
 
     /* allocate new temporaries for the value and the result               */
     isb = CVAR_TEMP( NewTemp( "isb" ) );
@@ -3300,13 +3333,17 @@ CVar CompElmsList (
     /* allocate a new temporary for the elements                           */
     elms = CVAR_TEMP( NewTemp( "elms" ) );
 
-    Emit("elmslist");
+    Emit("{ \"type\":\"elmslist\", \"list\":");
 
     /* compile the list expression (checking is done by 'ElmsListCheck')   */
     list = CompExpr( ADDR_EXPR(expr)[0] );
 
+    Emit(", \"pos\":");
+
     /* compile the position expression (checking done by 'ElmsListCheck')  */
     poss = CompExpr( ADDR_EXPR(expr)[1] );
+
+    Emit("}");
 
     /* emit the code to get the element                                    */
     //Emit( "%c = ElmsListCheck( %c, %c );\n", elms, list, poss );
@@ -3334,17 +3371,22 @@ CVar CompElmListLev (
     CVar                pos;            /* position                        */
     Int                 level;          /* level                           */
 
-    Emit("elmListLev");
+    Emit("{ \"type\":\"elmListLev\", \"lists\":");
 
     /* compile the lists expression                                        */
     lists = CompExpr( ADDR_EXPR(expr)[0] );
+
+    Emit(", \"pos\":");
 
     /* compile and check the position expression                           */
     pos = CompExpr( ADDR_EXPR(expr)[1] );
     CompCheckIntSmallPos( pos );
 
+    Emit(", \"level\":");
     /* get the level                                                       */
     level = (Int)(ADDR_EXPR(expr)[2]);
+
+    Emit("%d}", level);
 
     /* emit the code to select the elements from several lists (to <lists>)*/
     //Emit( "ElmListLevel( %c, %c, %d );\n", lists, pos, level );
@@ -3368,16 +3410,22 @@ CVar CompElmsListLev (
     CVar                poss;           /* positions                       */
     Int                 level;          /* level                           */
 
-    Emit("ElmsListLev");
+    Emit("\"type\":\"ElmsListLev\", \"list\":");
 
     /* compile the lists expression                                        */
     lists = CompExpr( ADDR_EXPR(expr)[0] );
 
+    Emit(", \"position\":");
+
     /* compile the position expression (checking done by 'ElmsListLevel')  */
     poss = CompExpr( ADDR_EXPR(expr)[1] );
 
+    Emit(", \"level\":");
+
     /* get the level                                                       */
     level = (Int)(ADDR_EXPR(expr)[2]);
+
+    Emit("}");
 
     /* emit the code to select the elements from several lists (to <lists>)*/
     //Emit( "ElmsListLevelCheck( %c, %c, %d );\n", lists, poss, level );
@@ -3401,7 +3449,7 @@ CVar CompIsbList (
     CVar                list;           /* list                            */
     CVar                pos;            /* position                        */
 
-    Emit("CompIsbList");
+    Emit("{ \"type\":\"CompIsbList\", \"list\":");
 
     /* allocate a new temporary for the result                             */
     isb = CVAR_TEMP( NewTemp( "isb" ) );
@@ -3409,9 +3457,12 @@ CVar CompIsbList (
     /* compile the list expression (checking is done by 'ISB_LIST')        */
     list = CompExpr( ADDR_EXPR(expr)[0] );
 
+    Emit(", \"position\":");
+
     /* compile and check the position expression                           */
     pos = CompExpr( ADDR_EXPR(expr)[1] );
-    CompCheckIntPos( pos );
+
+    Emit("}");
 
     /* emit the code to test the element                                   */
     //Emit( "%c = C_ISB_LIST( %c, %c );\n", isb, list, pos );
@@ -3481,7 +3532,7 @@ CVar CompElmRecExpr (
     CVar                record;         /* the record, left operand        */
     CVar                rnam;           /* the name, right operand         */
 
-    Emit("CompElmRecExpr");
+    Emit("{ \"type\":\"CompElmRecExpr\", \"record\":");
 
     /* allocate a new temporary for the element                            */
     elm = CVAR_TEMP( NewTemp( "elm" ) );
@@ -3489,8 +3540,12 @@ CVar CompElmRecExpr (
     /* compile the record expression (checking is done by 'ELM_REC')       */
     record = CompExpr( ADDR_EXPR(expr)[0] );
 
+    Emit(", \"name\":");
+
     /* compile the record name expression                                  */
     rnam = CompExpr( ADDR_EXPR(expr)[1] );
+
+    Emit("}");
 
     /* emit the code to select the element of the record                   */
     //Emit( "%c = ELM_REC( %c, RNamObj(%c) );\n", elm, record, rnam );
@@ -3561,7 +3616,7 @@ CVar CompIsbRecExpr (
     CVar                record;         /* the record, left operand        */
     CVar                rnam;           /* the name, right operand         */
 
-    Emit("CompIsbRecExpr");
+    Emit("{\"type\":\"CompIsbRecExpr\", \"record\":");
 
     /* allocate a new temporary for the result                             */
     isb = CVAR_TEMP( NewTemp( "isb" ) );
@@ -3569,8 +3624,12 @@ CVar CompIsbRecExpr (
     /* compile the record expression (checking is done by 'ISB_REC')       */
     record = CompExpr( ADDR_EXPR(expr)[0] );
 
+    Emit(", \"name\":");
+
     /* compile the record name expression                                  */
     rnam = CompExpr( ADDR_EXPR(expr)[1] );
+
+    Emit("}");
 
     /* emit the code to test the element                                   */
     //Emit( "%c = (ISB_REC( %c, RNamObj(%c) ) ? True : False);\n",
@@ -4257,16 +4316,21 @@ void CompFor (
         /* allocate a new temporary for the loop variable                  */
         lidx = CVAR_TEMP( NewTemp( "lidx" ) );
 
+        Emit("{\"type\":\"range\", \"first\":");
+
         /* compile and check the first and last value                      */
         first = CompExpr( ADDR_EXPR( ADDR_STAT(stat)[1] )[0] );
-        CompCheckIntSmall( first );
+
+        Emit(", \"last\":");
 
         /* compile and check the last value                                */
         /* if the last value is in a local variable,                       */
         /* we must copy it into a temporary,                               */
         /* because the local variable may change its value in the body     */
         last  = CompExpr( ADDR_EXPR( ADDR_STAT(stat)[1] )[1] );
-        CompCheckIntSmall( last  );
+
+        Emit("}");
+
         if ( IS_LVAR_CVAR(last) ) {
             elm = CVAR_TEMP( NewTemp( "last" ) );
             //Emit( "%c = %c;\n", elm, last );
@@ -4542,6 +4606,7 @@ void CompRepeat (
 
     /* compile the body                                                    */
     for ( i = 1; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
+        if(i > 1) { Emit(",");}
         CompStat( ADDR_STAT(stat)[i] );
     }
 
@@ -4672,10 +4737,12 @@ void CompUnbLVar (
     LVar                lvar;           /* local variable                  */
 
     //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{'type':'assign', 'subtype':'UnbLVar', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"UnbLVar\", " );
 
     /* emit the code for the assignment                                    */
     lvar = (LVar)(ADDR_STAT(stat)[0]);
+
+    Emit("\"identifier\":\"%s\"", NAME_LVAR(lvar));
     if ( CompGetUseHVar( lvar ) ) {
         //Emit( "ASS_LVAR( %d, 0 );\n", GetIndxHVar(lvar) );
     }
@@ -4699,7 +4766,7 @@ void CompAssHVar (
     CVar                rhs;            /* right hand side                 */
 
     //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{'type':'assign', 'subtype':'HVar', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"HVar\", \"rhs\":" );
 
     /* compile the right hand side expression                              */
     rhs = CompExpr( ADDR_STAT(stat)[1] );
@@ -4707,6 +4774,7 @@ void CompAssHVar (
     /* emit the code for the assignment                                    */
     hvar = (HVar)(ADDR_STAT(stat)[0]);
     CompSetUseHVar( hvar );
+    Emit(", \"identifier\":\"%s\"", NAME_HVAR(hvar));
     //Emit( "ASS_LVAR_%dUP( %d, %c );\n",
     //       GetLevlHVar(hvar), GetIndxHVar(hvar), rhs );
 
@@ -4728,11 +4796,12 @@ void CompUnbHVar (
 
     /* print a comment                                                     */
      //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{'type':'assign', 'subtype':'UnbHVar', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"UnbHVar\", " );
 
     /* emit the code for the assignment                                    */
     hvar = (HVar)(ADDR_STAT(stat)[0]);
     CompSetUseHVar( hvar );
+    Emit("\"identifier\":\"%s\"", NAME_HVAR(hvar));
     //Emit( "ASS_LVAR_%dUP( %d, 0 );\n",
     //      GetLevlHVar(hvar), GetIndxHVar(hvar) );
     Emit( "}" );
@@ -4749,13 +4818,13 @@ void CompAssGVar (
     GVar                gvar;           /* global variable                 */
     CVar                rhs;            /* right hand side                 */
 
-    Emit( "{'type':'assign', 'subtype':'GVar', ");
+    Emit( "{\"type\":\"assign\", \"subtype\":\"GVar\", ");
 
     /* emit the code for the assignment                                    */
     gvar = (GVar)(ADDR_STAT(stat)[0]);
     CompSetUseGVar( gvar, COMP_USE_GVAR_ID );
-    Emit( "'gvar':'%s'", NameGVar(gvar));
-    Emit(", 'rightHandSide':" );
+    Emit( "\"gvar\":\"%s\"", NameGVar(gvar));
+    Emit(", \"rightHandSide\":" );
 
     /* compile the right hand side expression                              */
     rhs = CompExpr( ADDR_STAT(stat)[1] );
@@ -4776,12 +4845,12 @@ void            CompUnbGVar (
 {
     GVar                gvar;           /* global variable                 */
 
-    Emit( "{'type':'assign', 'subtype':'UnbGVar', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"UnbGVar\", " );
    // PrintStat( stat );
 
     /* emit the code for the assignment                                    */
     gvar = (GVar)(ADDR_STAT(stat)[0]);
-    Emit( ", 'gvar':'%s'", NameGVar(gvar));
+    Emit( ", \"gvar\":\"%s\"", NameGVar(gvar));
     CompSetUseGVar( gvar, COMP_USE_GVAR_ID );
     //Emit( "AssGVar( G_%n, 0 );\n", NameGVar(gvar) );
     
@@ -4802,18 +4871,18 @@ void CompAssList (
 
     /* print a comment                                                     */
         //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{'type':'assign', 'subtype':'list', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"list\", " );
 
-    Emit("'list':");
+    Emit("\"list\":");
     /* compile the list expression                                         */
     list = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", 'position':");
+    Emit(", \"position\":");
     /* compile and check the position expression                           */
     pos = CompExpr( ADDR_STAT(stat)[1] );
     CompCheckIntPos( pos );
 
-    Emit(", 'rightHandSide':");
+    Emit(", \"rightHandSide\":");
     /* compile the right hand side                                         */
     rhs = CompExpr( ADDR_STAT(stat)[2] );
 
@@ -4851,17 +4920,17 @@ void CompAsssList (
     CVar                rhss;           /* right hand sides                */
 
         //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{'type':'assign', 'subtype':'sList', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"sList\", " );
     
-    Emit("'list':");
+    Emit("\"list\":");
     /* compile the list expression                                         */
     list = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", 'position':");
+    Emit(", \"position\":");
     /* compile and check the position expression                           */
     poss = CompExpr( ADDR_STAT(stat)[1] );
 
-    Emit(", 'rightHandSide':");
+    Emit(", \"rightHandSide\":");
     /* compile the right hand side                                         */
     rhss = CompExpr( ADDR_STAT(stat)[2] );
 
@@ -4890,24 +4959,24 @@ void CompAssListLev (
     Int                 level;          /* level                           */
 
     //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{'type':'assign', 'subtype':'listLev', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"listLev\", " );
 
-    Emit("'list':");
+    Emit("\"list\":");
     /* compile the list expressions                                        */
     lists = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", 'position':");
+    Emit(", \"position\":");
     /* compile and check the position expression                           */
     pos = CompExpr( ADDR_STAT(stat)[1] );
     CompCheckIntSmallPos( pos );
 
-    Emit(", 'rightHandSide':");
+    Emit(", \"rightHandSide\":");
     /* compile the right hand sides                                        */
     rhss = CompExpr( ADDR_STAT(stat)[2] );
 
     /* get the level                                                       */
     level = (Int)(ADDR_STAT(stat)[3]);
-    Emit(", 'level':%d", level);
+    Emit(", \"level\":%d", level);
 
     Emit( "}" );
     /* emit the code                                                       */
@@ -4933,23 +5002,23 @@ void CompAsssListLev (
     Int                 level;          /* level                           */
 
     //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{'type':'assign', 'subtype':'sListLev', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"sListLev\", " );
 
-    Emit("'list':");
+    Emit("\"list\":");
     /* compile the list expressions                                        */
     lists = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", 'position':");
+    Emit(", \"position\":");
     /* compile and check the position expression                           */
     poss = CompExpr( ADDR_STAT(stat)[1] );
 
-    Emit(", 'rightHandSide':");
+    Emit(", \"rightHandSide\":");
     /* compile the right hand side                                         */
     rhss = CompExpr( ADDR_STAT(stat)[2] );
 
     /* get the level                                                       */
     level = (Int)(ADDR_STAT(stat)[3]);
-    Emit(", 'level':%d", level);
+    Emit(", \"level\":%d", level);
 
     /* emit the code                                                       */
     //Emit( "AsssListLevelCheck( %c, %c, %c, %d );\n",
@@ -4975,13 +5044,13 @@ void CompUnbList (
     CVar                pos;            /* position, left operand          */
 
     //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{'type':'assign', 'subtype':'unbList', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"unbList\", " );
 
-    Emit("'list':");
+    Emit("\"list\":");
     /* compile the list expression                                         */
     list = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", 'position':");
+    Emit(", \"position\":");
     /* compile and check the position expression                           */
     pos = CompExpr( ADDR_STAT(stat)[1] );
     CompCheckIntPos( pos );
@@ -5009,19 +5078,19 @@ void CompAssRecName (
     CVar                rhs;            /* rhs, right operand              */
 
     //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{'type':'assign', 'subtype':'recName', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"recName\", " );
 
-    Emit("'record':");
+    Emit("\"record\":");
     /* compile the record expression                                       */
     record = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", 'name':");
+    Emit(", \"name\":");
     /* get the name (stored immediately in the statement)                  */
     rnam = (UInt)(ADDR_STAT(stat)[1]);
     Emit("\"%s\"", NAME_RNAM(rnam));
     //CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
-    Emit(", 'rightHandSide':");
+    Emit(", \"rightHandSide\":");
     /* compile the right hand side                                         */
     rhs = CompExpr( ADDR_STAT(stat)[2] );
 
@@ -5048,17 +5117,17 @@ void CompAssRecExpr (
     CVar                rhs;            /* rhs, right operand              */
 
     //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{'type':'assign', 'subtype':'recExpr', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"recExpr\", " );
 
-    Emit("'record':");
+    Emit("\"record\":");
     /* compile the record expression                                       */
     record = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", 'rnam':");
+    Emit(", \"rnam\":");
     /* get the name (stored immediately in the statement)                  */
     rnam = CompExpr( ADDR_STAT(stat)[1] );
 
-    Emit(", 'rhs':");
+    Emit(", \"rhs\":");
     /* compile the right hand side                                         */
     rhs = CompExpr( ADDR_STAT(stat)[2] );
 
@@ -5085,13 +5154,13 @@ void CompUnbRecName (
     UInt                rnam;           /* name, left operand              */
 
     //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{'type':'assign', 'subtype':'UnbRecName', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"UnbRecName\", " );
 
-    Emit("'record':");
+    Emit("\"record\":");
     /* compile the record expression                                       */
     record = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", 'rnam':");
+    Emit(", \"rnam\":");
     /* get the name (stored immediately in the statement)                  */
     rnam = (UInt)(ADDR_STAT(stat)[1]);
     Emit("\"%s\"", NAME_RNAM(rnam));
@@ -5118,14 +5187,14 @@ void            CompUnbRecExpr (
     CVar                rnam;           /* name, left operand              */
 
         //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{'type':'assign', 'subtype':'UnbRecExpr', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"UnbRecExpr\", " );
 
 
-    Emit("'record':");
+    Emit("\"record\":");
     /* compile the record expression                                       */
     record = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", 'rnam':");
+    Emit(", \"rnam\":");
     /* get the name (stored immediately in the statement)                  */
     rnam = CompExpr( ADDR_STAT(stat)[1] );
 
@@ -5152,18 +5221,18 @@ void CompAssPosObj (
     CVar                rhs;            /* right hand side                 */
 
         //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{'type':'assign', 'subtype':'posObj', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"posObj\", " );
 
-    Emit("'list':");
+    Emit("\"list\":");
     /* compile the list expression                                         */
     list = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", 'pos':");
+    Emit(", \"pos\":");
     /* compile and check the position expression                           */
     pos = CompExpr( ADDR_STAT(stat)[1] );
 //    CompCheckIntSmallPos( pos );
 
-    Emit(", 'rightHandSide':");
+    Emit(", \"rightHandSide\":");
     /* compile the right hand side                                         */
     rhs = CompExpr( ADDR_STAT(stat)[2] );
 
@@ -5197,17 +5266,17 @@ void CompAsssPosObj (
     CVar                rhss;           /* right hand sides                */
 
     //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{'type':'assign', 'subtype':'sPosObj', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"sPosObj\", " );
 
-    Emit("'list':");
+    Emit("\"list\":");
     /* compile the list expression                                         */
     list = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", 'poss':");
+    Emit(", \"poss\":");
     /* compile and check the position expression                           */
     poss = CompExpr( ADDR_STAT(stat)[1] );
 
-    Emit(", 'rhss':");
+    Emit(", \"rhss\":");
     /* compile the right hand side                                         */
     rhss = CompExpr( ADDR_STAT(stat)[2] );
 
@@ -5258,13 +5327,13 @@ void CompUnbPosObj (
     CVar                pos;            /* position, left operand          */
 
     //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{'type':'UnbPosObj', " );
+    Emit( "{\"type\":\"UnbPosObj\", " );
 
-    Emit("'list':");
+    Emit("\"list\":");
     /* compile the list expression                                         */
     list = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", 'pos':");
+    Emit(", \"pos\":");
     /* compile and check the position expression                           */
     pos = CompExpr( ADDR_STAT(stat)[1] );
     CompCheckIntSmallPos( pos );
@@ -5298,19 +5367,19 @@ void CompAssComObjName (
     CVar                rhs;            /* rhs, right operand              */
 
     //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{'type':'assign', 'subtype':'ComObjName', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"ComObjName\", " );
 
-    Emit("'record':");
+    Emit("\"record\":");
     /* compile the record expression                                       */
     record = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", 'rnam':");
+    Emit(", \"rnam\":");
     /* get the name (stored immediately in the statement)                  */
     rnam = (UInt)(ADDR_STAT(stat)[1]);
     Emit("\"%s\"", NAME_RNAM(rnam));
     CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
-    Emit(", 'rhs':");
+    Emit(", \"rhs\":");
     /* compile the right hand side                                         */
     rhs = CompExpr( ADDR_STAT(stat)[2] );
 
@@ -5346,17 +5415,17 @@ void CompAssComObjExpr (
 
     //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
 
-    Emit( "{'type':'assign', 'subtype':'ComObjExpr', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"ComObjExpr\", " );
 
-    Emit( "'record':" );
+    Emit( "\"record\":" );
     /* compile the record expression                                       */
     record = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit( ", 'rnam':" );
+    Emit( ", \"rnam\":" );
     /* get the name (stored immediately in the statement)                  */
     rnam = CompExpr( ADDR_STAT(stat)[1] );
 
-    Emit( ", 'rhs':" );
+    Emit( ", \"rhs\":" );
     /* compile the right hand side                                         */
     rhs = CompExpr( ADDR_STAT(stat)[2] );
 
@@ -5391,13 +5460,13 @@ void CompUnbComObjName (
     UInt                rnam;           /* name, left operand              */
 
     //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{'type':'assign', 'subtype':'UnbComObjName', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"UnbComObjName\", " );
 
-    Emit("'record':");
+    Emit("\"record\":");
     /* compile the record expression                                       */
     record = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", 'rnam':");
+    Emit(", \"rnam\":");
     /* get the name (stored immediately in the statement)                  */
     rnam = (UInt)(ADDR_STAT(stat)[1]);
     Emit("\"%s\"", NAME_RNAM(rnam));
@@ -5432,13 +5501,13 @@ void CompUnbComObjExpr (
     UInt                rnam;           /* name, left operand              */
 
     //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{'type':'assign', 'subtype':'UnbComObjExpr', " );
+    Emit( "{\"type\":\"assign\", \"subtype\":\"UnbComObjExpr\", " );
 
-    Emit("'record':");
+    Emit("\"record\":");
     /* compile the record expression                                       */
     record = CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", 'rnam':");
+    Emit(", \"rnam\":");
     /* get the name (stored immediately in the statement)                  */
     rnam = CompExpr( ADDR_STAT(stat)[1] );
     Emit("\"%s\"", NAME_RNAM(rnam));
@@ -5529,8 +5598,12 @@ void CompAssert2 (
     CVar                lev;            /* the level                       */
     CVar                cnd;            /* the condition                   */
 
+    Emit("{\"type\":\"Assert\", \"subtype\":\"Assert2\", ");
+    Emit("\"level\":");
     lev = CompExpr( ADDR_STAT(stat)[0] );
+    Emit(", \"condition\":");
     cnd = CompBoolExpr( ADDR_STAT(stat)[1] );
+    Emit("}");
     
     /* free the temporaries                                                */
     if ( IS_TEMP_CVAR( cnd ) )  FreeTemp( TEMP_CVAR( cnd ) );
@@ -5549,12 +5622,18 @@ void CompAssert3 (
     CVar                cnd;            /* the condition                   */
     CVar                msg;            /* the message                     */
 
+    Emit("{\"type\":\"Assert\", \"subtype\":\"Assert3\", ");
+    Emit("\"level\":");
+
     //Emit( "\n/* Assert( ... ); */\n" );
     lev = CompExpr( ADDR_STAT(stat)[0] );
     //Emit( "if ( ! LT(CurrentAssertionLevel, %c) ) {\n", lev );
+    Emit(", \"condition\":");
     cnd = CompBoolExpr( ADDR_STAT(stat)[1] );
     //Emit( "if ( ! %c ) {\n", cnd );
+    Emit(", \"message\":");
     msg = CompExpr( ADDR_STAT(stat)[2] );
+    Emit("}");
     //Emit( "if ( %c != (Obj)(UInt)0 )", msg );
     //Emit( "{\n if ( IS_STRING_REP ( %c ) )\n", msg);
     //Emit( "   PrintString1( %c);\n else\n   PrintObj(%c);\n}\n", msg, msg );
