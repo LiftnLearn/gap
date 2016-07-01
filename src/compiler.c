@@ -728,12 +728,31 @@ UInt            CompGetUseRNam (
 **  ('INTOBJ_INT(<int>)'  for integers,  'a_<name>' for arguments, 'l_<name>'
 **  for locals, 't_<nr>' for temporaries), and '%%' outputs a single '%'.
 */
+char* preProcessControlSequences(char* str, int len) {
+  char* newStr = (char*) malloc(sizeof(char) * len * 4 + 1); //+ 1 for NULL
+  
+  int i = 0;
+  char* p, *j;
+  for(p = str, j = newStr; i < len; ++i, ++p, ++j) {
+    if(!isprint(*p)) {
+       sprintf(j, "\\%03u", *p); //TODO: maybe use snprintf?
+       j += 3;
+    } else {
+        *j = *p;
+    }
+  }
+  *j = '\0';
+
+  return newStr;
+}
+
+
 char* escapeWhitespace(char* str) {
     //allocate new output string
     char* newStr = (char*) malloc(sizeof(char) * strlen(str) * 5); //TODO: set this back to 2 after redundant \ is removed
-    
+        
     char* p, *j;
-    for(p = str, j = newStr; *p != '\0'; ++j, ++p) {
+    for(p = str, j = newStr; (*p) != '\0'; ++j, ++p) {
         if(isspace(*p)) {
             if(*p == ' ') {
               *j = *p;
@@ -783,18 +802,6 @@ char* escapeWhitespace(char* str) {
             *j = '\\';
             ++j;
             *j = 'c';
-        } else if(!isprint(*p)) {
-           // *j = '\\'; //TODO: remove
-           // ++j;
-           // *j = '\\';
-           // ++j;
-           // *j = '0';
-           // ++j;
-           // *j = '3';
-           // ++j;
-           // *j = '3';
-           sprintf(j, "\\%03x"); //TODO: maybe use snprintf?
-           j += 3;
         } else {
             *j = *p;
         }
@@ -836,6 +843,15 @@ void            Emit (
             } else if(*p == 'd') { //found integer
                 int i = va_arg(ap, int);
                 fprintf(json, "%d", i);
+            } else if(*p == 'S') { //found string with prepended size
+                char* str = va_arg(ap, char*);
+                int len = (int) *(UInt*)str;
+                str += sizeof(UInt);
+                char* preprocessedStr = preProcessControlSequences(str, len);
+                str = escapeWhitespace(preprocessedStr);
+                fprintf(json, "%s", str);
+                free(str);
+                free(preprocessedStr); 
             } else {
                 fprintf(stderr, "ERROR: Unexpected string in compiler.c, Emit\n");
             }
@@ -2909,7 +2925,8 @@ CVar CompStringExpr (
     string = CVAR_TEMP( NewTemp( "string" ) );
 
     //TODO:
-    Emit("\"%s\"", (sizeof(UInt) + (Char*)ADDR_EXPR(expr)));
+//    Emit("\"%S\"", (sizeof(UInt) + (Char*)ADDR_EXPR(expr)));
+    Emit("\"%S\"", (Char*)ADDR_EXPR(expr));
 //    Pr( "%C", (Int)(sizeof(UInt) + (Char*)ADDR_EXPR(expr)), 0L);
 
     /* create the string and copy the stuff                                */
@@ -5897,8 +5914,8 @@ Obj FuncCOMPILE_FUNC (
     
     /* compile the function                                                */
     nr = CompileFunc(
-        CSTR_STRING(output), func, CSTR_STRING(name),
-        INT_INTOBJ(magic1), CSTR_STRING(magic2) );
+        CHARS_STRING(output), func, CHARS_STRING(name),
+        INT_INTOBJ(magic1), CHARS_STRING(magic2) );
 
 
     /* return the result                                                   */
