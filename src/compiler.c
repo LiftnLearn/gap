@@ -4060,7 +4060,10 @@ void (* CompStatFuncs[256]) ( Stat stat );
 void CompStat (
     Stat                stat )
 {
+    //emit line number
+    Emit("{ \"type\":\"debugInfo\", \"line\":%d, \"stat\":", LINE_STAT(stat));
     (* CompStatFuncs[ TNUM_STAT(stat) ])( stat );
+    Emit("}");
 }
 
 
