@@ -5845,7 +5845,7 @@ Int CompileFunc (
         return 0;
     }
 
-    json = fopen("test.json", "w");
+    json = fopen(output, "w");
 
     if(!json) {
       printf("JSON file couldn't be openend.");
@@ -5914,6 +5914,8 @@ Obj FuncCOMPILE_FUNC (
     output = ELM_LIST( arg, 1 );
     func   = ELM_LIST( arg, 2 );
     name   = ELM_LIST( arg, 3 );
+    magic1 = ELM_LIST( arg, 4 );
+    magic2 = ELM_LIST( arg, 5 );
     
     /* compile the function                                                */
     nr = CompileFunc(
