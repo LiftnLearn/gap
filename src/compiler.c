@@ -826,7 +826,10 @@ void            Emit (
     if ( CompPass != 2 )  return;
 
     /* get the information bag                                             */
-    narg = (NARG_FUNC( CURR_FUNC ) != -1 ? NARG_FUNC( CURR_FUNC ) : 1);
+    narg = NARG_FUNC( CURR_FUNC );
+    if (narg < 0) {
+        narg = -narg;
+    }
 
     va_start( ap, fmt );
 
@@ -5759,7 +5762,10 @@ void CompFunc (
     Int                 i;              /* loop variable                   */
 
     /* get the number of arguments and locals                              */
-    narg = (NARG_FUNC(func) != -1 ? NARG_FUNC(func) : 1);
+    narg = NARG_FUNC(func);
+    if (narg < 0) {
+        narg = -narg;
+    }
     nloc = NLOC_FUNC(func);
 
     Emit("{ \"type\":\"function\", \"param\":[");
