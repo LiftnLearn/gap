@@ -1,4 +1,7 @@
 LoadPackage("json");
-file := IO_File("../gap/test.json", "r");;
+file := IO_File("test.json", "r");;
 stream := IO_ReadUntilEOF(file);;
-rec := JsonStringToGap(stream);;
+record := JsonStringToGap(stream);;
+
+Read("findObjectify.g");
+processJSON(record);
