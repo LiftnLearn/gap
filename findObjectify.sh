@@ -1,10 +1,17 @@
 #!/bin/bash
 
-GAP="/Users/Eggi/Development/gap/bin/gap.sh"
-GAP_DIR="/Users/Eggi/Development/gap"
+#usage: pass the root directory of the gap installation as first argument
 
-JSON="/Users/Eggi/Development/gap/json_output"
-DEST="/Users/Eggi/Development/gap/objectifies.txt"
+if [ -z "$1" ]; then
+        echo "usage: ./findObjectify.sh <absolute path to GAP installation>"
+        exit 1
+fi
+
+GAP_DIR=$1
+GAP="$GAP_DIR/bin/gap.sh"
+
+JSON="$GAP_DIR/json_output"
+DEST="$GAP_DIR/objectifies.txt"
 
 for file in $JSON/*.json
 do 

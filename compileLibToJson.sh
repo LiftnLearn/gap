@@ -1,9 +1,16 @@
 #!/bin/bash
 
-GAC="/Users/Eggi/Development/gap/bin/x86_64-apple-darwin14.5.0-gcc-default64/gac"
-GAP_DIR="/Users/Eggi/Development/gap"
+#usage: pass the root directory of the gap installation as first argument
 
-DEST="/Users/Eggi/Development/gap/json_output"
+if [ -z "$1" ]; then
+        echo "usage: ./compileLibToJson.sh <absolute path to GAP installation>"
+        exit 1
+fi
+
+GAP_DIR="$1"
+GAC="`find $GAP_DIR -name \"gac\"`"
+
+DEST="$GAP_DIR/json_output"
 
 for file in $GAP_DIR/lib/*.gi
 do 
@@ -14,6 +21,6 @@ do
   $GAC -o $DEST/$filename.json -C $file
 
   #prettify
-  #python -m json.tool $DEST/$filename.json > $DEST/$filename.prettified.json
+  python -m json.tool $DEST/$filename.json > $DEST/$filename.prettified.json
 
 done
