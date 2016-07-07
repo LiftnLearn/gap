@@ -1,5 +1,7 @@
 #Read("gaptypes.g");
 
+outputFile := "";
+
 flattenToStrings :=
     function(root, flattenList)
         local i;
@@ -42,6 +44,7 @@ getFilterList :=
 
     end;
 
+
 flattenToRecords :=
     function(root, recordList)
         local i;
@@ -69,7 +72,7 @@ findLocalAssignments :=
         assignments := []; 
         for r in records do
             if(IsBound(r.type) and r.type = "assign"
-              and r.left = "K") then
+              and IsBound(r.left) and r.left = "K") then
                 Add(assignments, r);
             fi;
         od;
@@ -80,9 +83,10 @@ findLocalAssignments :=
 handleRecord :=
     function(stack, node, line, surroundingFunction)
         local args, assignments, type, i, filterSubtree,
-          listOfAssignmentFilters, filters, filterIDs;
+          listOfAssignmentFilters, filters, filterIDs, objectifyFound;
 
         filters := [];
+        objectifyFound := false;
 
         if(IsBound(node.type) and node.type = "debugInfo") then
             line := node.line; #as we are using essentially a
@@ -93,6 +97,7 @@ handleRecord :=
         elif (IsRecord(node)
                   and IsBound(node.type)
                   and node.type = "functionCall"
+                  and IsBound(node.name.identifier)
                   and (node.name.identifier = "InstallMethod" 
                   or node.name.identifier = "InstallOtherMethod"
                   or node.name.identifier = "InstallGlobalFunction")) then
@@ -105,7 +110,8 @@ handleRecord :=
           and (node.name.identifier = "Objectify"
           or node.name.identifier = "ObjectifyWithAttributes")) then
 
-            Print("line ", line, ": Objectify found", "\n");
+            objectifyFound := true;
+            AppendTo(outputFile, "line ", line, ": Objectify found", "\n");
     
             if(node.name.identifier = "Objectify") then
                 type := node.args[1];
@@ -145,7 +151,9 @@ handleRecord :=
                         od;
 
                         #find common subset
-                        filters := Intersection[listOfAssignmentFilters];
+                        if(Length(listOfAssignmentFilters) > 0) then
+                            filters := Intersection(listOfAssignmentFilters);
+                        fi;
 
                         #   filter those for the right variable
                         #   if necessary find common subset
@@ -163,9 +171,6 @@ handleRecord :=
                         fi;
 
                     fi;
-                else 
-                    Print("IsObject\n");
-                    filters := [IsObject];
                 fi;
             fi;
         fi; 
@@ -174,6 +179,10 @@ handleRecord :=
         for i in RecNames(node) do
             Add(stack, node.(i));
         od;
+
+        if(objectifyFound = true and Length(filters) = 0) then
+            filters := ["IsObject"];
+        fi;
 
         return rec(line:=line, surroundingFunction:=surroundingFunction,
           filters:=filters);
@@ -184,6 +193,8 @@ processJSON :=
     function(obj, file)
         local stack, node, el, i, line, args, list, stackInfo_list,
               surroundingFunction, temp;
+
+        outputFile := file;
 
         surroundingFunction := false; #is there some null equivalent in GAP?
 
@@ -231,7 +242,7 @@ processJSON :=
                 line := temp.line;
 
                 if (Length(temp.filters) > 0) then
-                    AppendTo(file, temp.filters, "\n");
+                    AppendTo(outputFile, "\t", temp.filters, "\n");
                 fi;
 
             else

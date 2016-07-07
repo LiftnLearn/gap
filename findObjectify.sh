@@ -13,20 +13,21 @@ GAP="$GAP_DIR/bin/gap.sh"
 JSON="$GAP_DIR/json_output"
 DEST="$GAP_DIR/objectifies.txt"
 
+echo "" >  $DEST
+
 for file in $JSON/*.json
 do 
 
   filename=${file##*/}
-
-  echo "" >  $DEST
+  echo "$filename \n" >> $DEST
 
   #create raw json output
   echo "LoadPackage(\"json\");
         file := IO_File(\"$file\", \"r\");;
-        stream := IO_ReadUntilEOF(file);;
-        record := JsonStringToGap(stream);;
+        string := IO_ReadUntilEOF(file);;
+        record := JsonStringToGap(string);;
         
-        Read(\"findObjectify.g\");
+        Read(\"$GAP_DIR/findObjectify.g\");
         processJSON(record, \"$DEST\"); quit;" | $GAP
 
 done
