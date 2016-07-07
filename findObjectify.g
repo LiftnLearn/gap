@@ -1,4 +1,6 @@
-flatten :=
+#Read("gaptypes.g");
+
+flattenToStrings :=
     function(root, flattenList)
         local i;
 
@@ -6,11 +8,11 @@ flatten :=
             Add(flattenList, root);
         elif(not IsString(root) and IsList(root)) then
             for i in root do
-                flatten(i, flattenList);
+                flattenToStrings(i, flattenList);
             od;
         elif(IsRecord(root)) then
             for i in RecNames(root) do
-                flatten(root.(i), flattenList);
+                flattenToStrings(root.(i), flattenList);
             od;
         fi;
     end;
@@ -22,11 +24,12 @@ flatten :=
 #       would need more sophisticated algorithm
 getFilterList :=
     function(root)
+
         local filterList, flattenedList, i; 
         
         #flatten the tree
         flattenedList := [];
-        flatten(root, flattenedList);
+        flattenToStrings(root, flattenedList);
 
         filterList := [];
         for i in flattenedList do
@@ -36,12 +39,153 @@ getFilterList :=
         od;
 
         return filterList;
+
     end;
 
+flattenToRecords :=
+    function(root, recordList)
+        local i;
+
+        if(IsRecord(root)) then
+            Add(recordList, root);
+
+            for i in RecNames(root) do
+                flattenToRecords(root.(i), recordList);
+            od;
+        elif(IsList(root)) then
+            for i in root do
+                flattenToRecords(i, recordList);
+            od;
+        fi;
+    end;
+
+findLocalAssignments :=
+    function(surroundingFunction, identifier)
+        local assignments, records, r;
+
+        records := [];
+        flattenToRecords(surroundingFunction, records);
+
+        assignments := []; 
+        for r in records do
+            if(IsBound(r.type) and r.type = "assign"
+              and r.left = "K") then
+                Add(assignments, r);
+            fi;
+        od;
+
+        return assignments;
+    end;
+
+handleRecord :=
+    function(stack, node, line, surroundingFunction)
+        local args, assignments, type, i, filterSubtree,
+          listOfAssignmentFilters, filters, filterIDs;
+
+        filters := [];
+
+        if(IsBound(node.type) and node.type = "debugInfo") then
+            line := node.line; #as we are using essentially a
+                               #stack this might give some
+                               #peculiar results
+
+        #cache a surrounding function if one is found
+        elif (IsRecord(node)
+                  and IsBound(node.type)
+                  and node.type = "functionCall"
+                  and (node.name.identifier = "InstallMethod" 
+                  or node.name.identifier = "InstallOtherMethod"
+                  or node.name.identifier = "InstallGlobalFunction")) then
+            surroundingFunction := node; 
+
+        #Objectify(..., ...) being found
+        elif(IsBound(node.type)
+          and node.type = "functionCall"
+          and IsBound(node.name.identifier)
+          and (node.name.identifier = "Objectify"
+          or node.name.identifier = "ObjectifyWithAttributes")) then
+
+            Print("line ", line, ": Objectify found", "\n");
+    
+            if(node.name.identifier = "Objectify") then
+                type := node.args[1];
+            else #ObjectifyWithAttributes
+                type := node.args[2];
+            fi;
+
+            #case Objectify(NewType(..., filters), ...)
+            if (IsBound(type.type)
+              and type.type = "functionCall"
+              and type.name.identifier = "NewType") then
+                filterSubtree := type.args[2];
+                
+                filters := getFilterList(filterSubtree);
+
+            #more general case
+            else
+                #distinguish cases -> TODO: modularize/refactor here,
+                #also put the case from above here (the previous elif)
+
+                #case where we find a local variable
+                if(IsRecord(type) and IsBound(type.type)
+                  and type.type = "variable") then
+                    if(IsBound(type.subtype)
+                      and type.subtype = "RefLVar") then
+                        #now find all assignments to this
+                        # variable within the surrounding function
+                        #use flatten for this / or some other generic lib-function
+                        #   find all assignments
+                        assignments := findLocalAssignments(surroundingFunction, type.identifier);
+
+                        #[list of lists]: each sublist contains filters in a given assignment -> find biggest common subset
+                        #TODO: find better name
+                        listOfAssignmentFilters := [];
+                        for i in assignments do
+                            Add(listOfAssignmentFilters, getFilterList(i));
+                        od;
+
+                        #find common subset
+                        filters := Intersection[listOfAssignmentFilters];
+
+                        #   filter those for the right variable
+                        #   if necessary find common subset
+                    elif(IsBound(type.subtype)
+                      and type.subtype = "RefGVar") then
+
+                        if(IsBoundGlobal(type.identifier)
+                          and IsType(ValueGlobal(type.identifier))) then
+                            #return all filters of this type
+
+                            filterIDs := TRUES_FLAGS(ValueGlobal(type.identifier)![2]);
+                            for i in filterIDs do
+                                Add(filters, NameFunction(FILTERS[i]));
+                            od;
+                        fi;
+
+                    fi;
+                else 
+                    Print("IsObject\n");
+                    filters := [IsObject];
+                fi;
+            fi;
+        fi; 
+
+        #always keep traversing down
+        for i in RecNames(node) do
+            Add(stack, node.(i));
+        od;
+
+        return rec(line:=line, surroundingFunction:=surroundingFunction,
+          filters:=filters);
+    end;
+
+
 processJSON :=
-    function(obj)
-        local stack, node, nodeIndex, el, i, line, args, list, stackInfo_list,
-              filterSubtree, type, surroundingFunction;
+    function(obj, file)
+        local stack, node, el, i, line, args, list, stackInfo_list,
+              surroundingFunction, temp;
+
+        surroundingFunction := false; #is there some null equivalent in GAP?
 
         stack := [obj];
         line := 1;
@@ -58,8 +202,10 @@ processJSON :=
 
                 Add(stack, stackInfo_list);
                 Add(stack, node[stackInfo_list.index]);
-            elif (IsRecord(node) and IsBound(node.type) and node.type="stackInfo_list") then
-                #when iterating a list there will always be the following order: stack(..., stackInfo_list, el_of_list)
+            elif (IsRecord(node) and IsBound(node.type)
+              and node.type="stackInfo_list") then
+                #when iterating a list there will always be the following
+                # order: stack(..., stackInfo_list, el_of_list)
 
                 #stackInfo_list:
                 #   node.type = stackInfo_list
@@ -67,7 +213,8 @@ processJSON :=
                 #   node.index = #index of list that was last explored
                 list := node.list;
                 
-                #only keep iterating over the list if not already fully explored
+                #only keep iterating over the list if not already fully
+                # explored
                 if( node.index < Length(list) ) then
                     stackInfo_list := rec( type  := "stackInfo_list",
                                            list  := list,
@@ -77,64 +224,16 @@ processJSON :=
                 fi;
 
             elif (IsRecord(node)) then 
-                if(IsBound(node.type) and node.type = "debugInfo") then
-                    line := node.line; #as we are using essentially a
-                                       #stack this might give some peculiar results
 
-                #case Objectify(NewType(..., filters), ...)
-                elif(IsBound(node.type)
-                  and node.type = "functionCall"
-                  and IsBound(node.name.identifier)
-                  and node.name.identifier = "Objectify") then
-                    Print("line ", line, ": Objectify found", "\n");
-                    args := node.args; 
+                temp := handleRecord(stack, node, line, surroundingFunction);
 
-                    if (Length(args) > 0 and IsBound(args[1].type)
-                      and args[1].type = "functionCall"
-                      and args[1].name.identifier = "NewType") then
-                        filterSubtree := args[1].args[2];
-                        Print("\tFollowing filters found: ", getFilterList(filterSubtree), "\n"); 
-                    fi;
+                surroundingFunction := temp.surroundingFunction;
+                line := temp.line;
 
-                #general case of Objectify(..., ...) being found
-                elif(IsBound(node.type)
-                  and node.type = "functionCall"
-                  and IsBound(node.name.identifier)
-                  and node.name.identifier = "Objectify") then #TODO: take care of ObjectifyWithAttributes
-                    i := Length(stack);
-                    surroundingFunction := stack[i];
+                if (Length(temp.filters) > 0) then
+                    AppendTo(file, temp.filters, "\n");
+                fi;
 
-                    #find the surrounding function in which Objectify is called
-                    while (i >= 0 and not(IsBound(surroundingFunction.type)
-                      and surroundingFunction.type = "functionCall"
-                      and (surroundingFunction.name.identifier = "InstallMethod" 
-                      or surroundingFunction.name.identifier = "InstallGlobalFunction")))
-                    do
-                        i := i - 1;
-                        surroundingFunction := stack[i];
-                    od;
-
-                    #distinguish cases -> TODO: modularize/refactor here,
-                    #also put the case from above here (the previous elif)
-                    
-                    type := node.args[1];
-
-                    #case where we find a local variable
-                    if(IsBound(type.type) and type.type = "variable") then
-                        if(IsBound(type.type.subtype) and type.type.subtype = "RefLVar") then
-                            #now find all assignments to this variable within the surrounding function
-                            #use flatten for this / or some other generic lib-function
-                            #   find all assignments
-                            #   filter those for the right variable
-                            #   if necessary find common subset
-                        fi;
-                    fi;
-                    
-                fi; 
-
-                for i in RecNames(node) do
-                    Add(stack, node.(i));
-                od;
             else
 #                if(IsString(node) and node = "Objectify") then
 #                    Print("line ", line, ": Objectify found", "\n");
