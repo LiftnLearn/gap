@@ -4438,7 +4438,7 @@ void CompFor (
         //    }
         //    MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
         //} while ( ! IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
-        CompPass = pass;
+        //CompPass = pass;
 
         /* emit the code for the loop                                      */
         //Emit( "for ( %c = %c;\n",                lidx, first );
@@ -5878,7 +5878,7 @@ Int CompileFunc (
     /* ok, lets emit some code now                                         */
     CompPass = 2;
 
-/********** create a JSON structure **********/
+    /********** create a JSON structure **********/
 
     /* now compile the handlers                                            */
     CompFunc( func );
