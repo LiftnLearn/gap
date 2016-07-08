@@ -1,4 +1,28 @@
-#Read("gaptypes.g");
+LoadPackage("json");
+
+record := false;
+
+callProcessJSON := 
+    function(gapPath)
+        local dest, file, string, f;
+
+        dest := Concatenation(gapPath, "/objectifies.txt");
+
+        PrintTo(dest, "");
+
+        for f in DirectoryContents(Concatenation(gapPath, "/json_output")) do
+           if(f[1] = '.') then
+               continue;
+           fi;
+
+           file := IO_File(Concatenation(gapPath, "/json_output/", f), "r");;
+           AppendTo(dest, f, "\n");
+           string := IO_ReadUntilEOF(file);;
+           record := JsonStringToGap(string);;
+           
+           processJSON(record, dest);;
+        od;
+    end;
 
 outputFile := "";
 
@@ -97,6 +121,7 @@ handleRecord :=
         elif (IsRecord(node)
                   and IsBound(node.type)
                   and node.type = "functionCall"
+                  and IsBound(node.name) #shouldn't this always be the case?
                   and IsBound(node.name.identifier)
                   and (node.name.identifier = "InstallMethod" 
                   or node.name.identifier = "InstallOtherMethod"
@@ -106,12 +131,13 @@ handleRecord :=
         #Objectify(..., ...) being found
         elif(IsBound(node.type)
           and node.type = "functionCall"
+          and IsBound(node.name)
           and IsBound(node.name.identifier)
           and (node.name.identifier = "Objectify"
           or node.name.identifier = "ObjectifyWithAttributes")) then
 
             objectifyFound := true;
-            AppendTo(outputFile, "line ", line, ": Objectify found", "\n");
+            AppendTo(outputFile, "\t", "line ", line, ": Objectify found", "\n");
     
             if(node.name.identifier = "Objectify") then
                 type := node.args[1];
@@ -122,7 +148,7 @@ handleRecord :=
             #case Objectify(NewType(..., filters), ...)
             if (IsBound(type.type)
               and type.type = "functionCall"
-              and type.name.identifier = "NewType") then
+              and IsBound(type.name) and type.name.identifier = "NewType") then
                 filterSubtree := type.args[2];
                 
                 filters := getFilterList(filterSubtree);
@@ -242,7 +268,7 @@ processJSON :=
                 line := temp.line;
 
                 if (Length(temp.filters) > 0) then
-                    AppendTo(outputFile, "\t", temp.filters, "\n");
+                    AppendTo(outputFile, "\t\t", temp.filters, "\n");
                 fi;
 
             else

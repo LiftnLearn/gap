@@ -729,7 +729,10 @@ UInt            CompGetUseRNam (
 **  for locals, 't_<nr>' for temporaries), and '%%' outputs a single '%'.
 */
 char* preProcessControlSequences(char* str, int len) {
-  char* newStr = (char*) malloc(sizeof(char) * len * 4 + 1); //+ 1 for NULL
+  Bag bag;
+  bag = NewBag(T_STRING, sizeof(char) * len * 4 + 1);
+
+  char* newStr = (char*) PTR_BAG(bag);//malloc(sizeof(char) * len * 4 + 1); //+ 1 for NULL
   
   int i = 0;
   char* p, *j;
@@ -749,7 +752,12 @@ char* preProcessControlSequences(char* str, int len) {
 
 char* escapeWhitespace(char* str) {
     //allocate new output string
-    char* newStr = (char*) malloc(sizeof(char) * strlen(str) * 5); //TODO: set this back to 2 after redundant \ is removed
+    Bag bag;
+    bag = NewBag(T_STRING, sizeof(char) * strlen(str) * 5);
+
+    char* newStr = (char*) PTR_BAG(bag);
+
+    //  char* newStr = (char*) malloc(sizeof(char) * strlen(str) * 5); //TODO: set this back to 2 after redundant \ is removed
         
     char* p, *j;
     for(p = str, j = newStr; (*p) != '\0'; ++j, ++p) {
@@ -842,7 +850,6 @@ void            Emit (
                 char* str = va_arg(ap, char*);
                 str = escapeWhitespace(str);
                 fprintf(json, "%s", str);
-                free(str);
             } else if(*p == 'd') { //found integer
                 int i = va_arg(ap, int);
                 fprintf(json, "%d", i);
@@ -853,8 +860,6 @@ void            Emit (
                 char* preprocessedStr = preProcessControlSequences(str, len);
                 str = escapeWhitespace(preprocessedStr);
                 fprintf(json, "%s", str);
-                free(str);
-                free(preprocessedStr); 
             } else {
                 fprintf(stderr, "ERROR: Unexpected string in compiler.c, Emit\n");
             }

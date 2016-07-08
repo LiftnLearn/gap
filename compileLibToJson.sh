@@ -21,6 +21,6 @@ do
   $GAC -o $DEST/$filename.json -C $file
 
   #prettify
-  python -m json.tool $DEST/$filename.json > $DEST/$filename.prettified.json
+  #python -m json.tool $DEST/$filename.json > $DEST/$filename.prettified.json
 
 done
