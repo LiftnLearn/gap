@@ -1,28 +1,5 @@
 LoadPackage("json");
 
-record := false;
-
-callProcessJSON := 
-    function(gapPath)
-        local dest, file, string, f;
-
-        dest := Concatenation(gapPath, "/objectifies.txt");
-
-        PrintTo(dest, "");
-
-        for f in DirectoryContents(Concatenation(gapPath, "/json_output")) do
-           if(f[1] = '.') then
-               continue;
-           fi;
-
-           file := IO_File(Concatenation(gapPath, "/json_output/", f), "r");;
-           AppendTo(dest, f, "\n");
-           string := IO_ReadUntilEOF(file);;
-           record := JsonStringToGap(string);;
-           
-           processJSON(record, dest);;
-        od;
-    end;
 
 outputFile := "";
 
@@ -104,29 +81,41 @@ findLocalAssignments :=
         return assignments;
     end;
 
+#known bugs: 
 handleRecord :=
-    function(stack, node, line, surroundingFunction)
-        local args, assignments, type, i, filterSubtree,
-          listOfAssignmentFilters, filters, filterIDs, objectifyFound;
+    function(stack, node, line, surroundingFunction,
+                surroundingFunctionLine, objectifyFunctionLine, message)
+
+        local args, assignments, type, i, filterSubtree, statNode,
+          listOfAssignmentFilters, filters, filterIDs, objectifyFound,
+          out, multipleObjectifiesFlag;
+
+        out := OutputTextString(message, true); 
 
         filters := [];
         objectifyFound := false;
+        multipleObjectifiesFlag := false;
 
         if(IsBound(node.type) and node.type = "debugInfo") then
             line := node.line; #as we are using essentially a
                                #stack this might give some
                                #peculiar results
 
-        #cache a surrounding function if one is found
-        elif (IsRecord(node)
-                  and IsBound(node.type)
-                  and node.type = "functionCall"
-                  and IsBound(node.name) #shouldn't this always be the case?
-                  and IsBound(node.name.identifier)
-                  and (node.name.identifier = "InstallMethod" 
-                  or node.name.identifier = "InstallOtherMethod"
-                  or node.name.identifier = "InstallGlobalFunction")) then
-            surroundingFunction := node; 
+            statNode := node.stat;
+ 
+            #cache a surrounding function if one is found
+            if (IsRecord(statNode)
+                  and IsBound(statNode.type)
+                  and statNode.type = "functionCall"
+                  and IsBound(statNode.name) #shouldn't this always be the case?
+                  and IsBound(statNode.name.identifier)
+                  and (statNode.name.identifier = "InstallMethod" 
+                  or statNode.name.identifier = "InstallOtherMethod"
+                  or statNode.name.identifier = "InstallGlobalFunction"
+                  or statNode.name.identifier = "BindGlobal")) then
+                surroundingFunction := statNode; 
+                surroundingFunctionLine := node.line;
+            fi;
 
         #Objectify(..., ...) being found
         elif(IsBound(node.type)
@@ -137,7 +126,29 @@ handleRecord :=
           or node.name.identifier = "ObjectifyWithAttributes")) then
 
             objectifyFound := true;
-            AppendTo(outputFile, "\t", "line ", line, ": Objectify found", "\n");
+            
+            if(not(objectifyFunctionLine = surroundingFunctionLine)) then
+                CloseStream(out);
+                AppendTo(outputFile, message);
+                
+                message := "";
+                out := OutputTextString(message, true);
+                objectifyFunctionLine := surroundingFunctionLine;
+            else
+                multipleObjectifiesFlag := true;
+                CloseStream(out);
+
+                message := "\tMultiple Objectify calls where found in the function ending at line: "; #TODO: insert line
+                out := OutputTextString(message, true);
+                AppendTo(out, objectifyFunctionLine, "\n");
+                CloseStream(out);
+
+                return rec(line := line, surroundingFunction := surroundingFunction,
+                  surroundingFunctionLine := surroundingFunctionLine, filters := filters,
+                  objectifyFunctionLine := objectifyFunctionLine, message := message);
+            fi;
+            
+            AppendTo(out, "\t", "line ", line, ": Objectify found", "\n");
     
             if(node.name.identifier = "Objectify") then
                 type := node.args[1];
@@ -210,19 +221,33 @@ handleRecord :=
             filters := ["IsObject"];
         fi;
 
-        return rec(line:=line, surroundingFunction:=surroundingFunction,
-          filters:=filters);
+        if (Length(filters) > 0) then
+            AppendTo(out, "\t\t", filters, "\n");
+        fi;
+
+        CloseStream(out);
+
+        return rec(line := line, surroundingFunction := surroundingFunction,
+                  surroundingFunctionLine := surroundingFunctionLine, filters := filters,
+                  objectifyFunctionLine := objectifyFunctionLine, message := message);
+
     end;
 
 
 processJSON :=
     function(obj, file)
         local stack, node, el, i, line, args, list, stackInfo_list,
-              surroundingFunction, temp;
+              surroundingFunction, surroundingFunctionLine, temp,
+              objectifyFunctionLine, message;
 
         outputFile := file;
 
         surroundingFunction := false; #is there some null equivalent in GAP?
+        surroundingFunctionLine := 1;
+
+        objectifyFunctionLine := 1;
+        
+        message := "";
 
         stack := [obj];
         line := 1;
@@ -262,15 +287,16 @@ processJSON :=
 
             elif (IsRecord(node)) then 
 
-                temp := handleRecord(stack, node, line, surroundingFunction);
+                temp := handleRecord(stack, node, line,
+                            surroundingFunction, surroundingFunctionLine,
+                            objectifyFunctionLine, message);
 
                 surroundingFunction := temp.surroundingFunction;
+                surroundingFunctionLine := temp.surroundingFunctionLine;
+                objectifyFunctionLine := temp.objectifyFunctionLine;
+                message := temp.message;
                 line := temp.line;
-
-                if (Length(temp.filters) > 0) then
-                    AppendTo(outputFile, "\t\t", temp.filters, "\n");
-                fi;
-
+        
             else
 #                if(IsString(node) and node = "Objectify") then
 #                    Print("line ", line, ": Objectify found", "\n");
@@ -279,4 +305,33 @@ processJSON :=
 
         od;
 
+        AppendTo(outputFile, message);
     end;
+
+
+record := false;
+
+#convenience function to analyze all files for objectify calls
+#TODO: make path to JSON files configurable, as well as name of output file
+callProcessJSON := 
+    function(gapPath)
+        local dest, file, string, f;
+
+        dest := Concatenation(gapPath, "/objectifies.txt");
+
+        PrintTo(dest, "");
+
+        for f in DirectoryContents(Concatenation(gapPath, "/json_output")) do
+           if(f[1] = '.') then
+               continue;
+           fi;
+
+           file := IO_File(Concatenation(gapPath, "/json_output/", f), "r");;
+           AppendTo(dest, f, "\n");
+           string := IO_ReadUntilEOF(file);;
+           record := JsonStringToGap(string);;
+           
+           processJSON(record, dest);;
+        od;
+    end;
+
