@@ -313,6 +313,7 @@ record := false;
 
 #convenience function to analyze all files for objectify calls
 #TODO: make path to JSON files configurable, as well as name of output file
+#TODO: read path to gap/-directory from global varible
 callProcessJSON := 
     function(gapPath)
         local dest, file, string, f;
