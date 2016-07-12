@@ -4151,7 +4151,7 @@ void CompProccallXArgs (
     UInt                narg;           /* number of arguments             */
     UInt                i;              /* loop variable                   */
 
-    Emit( "{ \"type\":\"functionCall\", \"function\":" );
+    Emit( "{ \"type\":\"functionCall\", \"name\":" );
 
     /* compile the reference to the function                               */
     if ( TNUM_EXPR( FUNC_CALL(stat) ) == T_REF_GVAR ) {
