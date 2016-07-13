@@ -38,7 +38,6 @@ function(root)
     od;
 
     return filterList;
-
 end;
 
 
@@ -196,25 +195,39 @@ function(obj)
         fi;
 
     #Objectify(..., ...) being found
+    #TODO: take care of BindGlobal
     elif(isObjectify(node) and not(surroundingFunction.name.identifier = "BindGlobal")) then
         objectifyFound := true;
         constructorName := surroundingFunction.args[1].identifier;
 
         if(not(IsBound(objectifys.(constructorName)))) then
             objectifys.(constructorName) := rec();
-            objectifys.(constructorName).type := surroundingFunction.name.identifier;
             objectifys.(constructorName).multipleObjectifiesFlag := false;
+            objectifys.(constructorName).inputFilters := [];
         fi;
 
+        
         #first Objectify call within surrounding function
         if(not(objectifyFunctionLine = surroundingFunctionLine)) then
             objectifyFunctionLine := surroundingFunctionLine;
+            objectifys.(constructorName).type := surroundingFunction.name.identifier;
                     
             if(node.name.identifier = "Objectify") then
                 type := node.args[1];
             else #ObjectifyWithAttributes
                 type := node.args[2];
             fi;
+
+            if(objectifys.(constructorName).type = "InstallMethod") then
+                i := 1;
+                while( i < Length(surroundingFunction.args)) do
+                    if(IsList(surroundingFunction.args[i]) and not(IsString(surroundingFunction.args[i]))) then
+                        Add(objectifys.(constructorName).inputFilters, surroundingFunction.args[i]);
+                    fi;
+                    i := i + 1;
+                od;
+            fi;
+
 
             #case Objectify(NewType(..., filters), ...)
             if (IsBound(type.type)
@@ -247,6 +260,8 @@ function(obj)
 
         else #multiple Objectify calls within single function
             objectifys.(constructorName).multipleObjectifiesFlag := true;
+
+            objectifys.(constructorName).filters := ["IsObject"];
         fi;
     fi;
 
@@ -315,6 +330,55 @@ function(node)
     return (isFunctionCall(node) and node.name.identifier = "DeclareOperation");
 end;
 
+
+#list: list of filter-records
+#gets a list of filter-records and returns a string representing it nicely
+unwrapFilters :=
+function(list)
+    local i, j, ans, str, filterWithAND;
+
+    ans := [];
+
+    i := 1;
+    while (i <= Length(list)) do
+        str := "";
+        filterWithAND := getFilterList(list[i]);
+        if(Length(filterWithAND) = 0) then
+            filterWithAND := ["IsObject"];
+        fi;
+
+        j := 1;
+        while( j <= Length(filterWithAND)) do
+            if(j > 1) then
+                str := Concatenation(str, " and ");
+            fi;
+            str := Concatenation(str, filterWithAND[j]);
+            j := j + 1;
+        od;
+        Add(ans, str);
+        i := i + 1;
+    od;
+
+    return ans;
+end;
+
+printListOfStrings :=
+function(list)
+    local i, str;
+    i := 1;
+    str := "[";
+
+    while(i <= Length(list)) do
+        if( i > 1) then str := Concatenation(str, ", "); fi;
+        str := Concatenation(str, list[i]);
+        i := i + 1;
+    od;
+    
+    str := Concatenation(str, "]");
+    return str;
+end;
+
+
 declareOperationHandler :=
 function(obj)
     local node, declaredOperations, declaredOperation, i;
@@ -330,14 +394,7 @@ function(obj)
     if(isDeclareOperation(node)) then 
         declaredOperation := rec();
         declaredOperation.name := node.args[1];
-        declaredOperation.inputFilters := [];
-
-        i := 1;
-        while (i <= Length(node.args[2])) do
-            Add(declaredOperation.inputFilters, node.args[2][i].identifier);
-            #TODO: verify that this is correct( what about with AND combined filters?)
-            i := i + 1;
-        od;
+        declaredOperation.inputFilters := unwrapFilters(node.args[2]);
 
         declaredOperations.(declaredOperation.name) := declaredOperation; 
     fi;
@@ -359,6 +416,9 @@ end;
 #pseudocode
 #for each DeclareOperation write MitM_DeclareConstructor(operationName, 
 #[inputFilters...], outputFilters(expand using AND));
+
+#TODO: find out what happened to DoubleCoset
+#TODO: make sure invalid values are handled (i.e. where filter not determined)
 declareOperations :=
 function(headerRec, implementRec, outputDest)
     local objectifys, declaredOperations, recName, i;
@@ -373,31 +433,80 @@ function(headerRec, implementRec, outputDest)
 
     #Print(objectifys, declaredOperations);
     for recName in RecNames(objectifys) do
-        objectifys.(recName) := Intersection(objectifys.(recName).filters);
+        objectifys.(recName).commonFilters := Intersection(objectifys.(recName).filters);
     od;
-    #TODO: make sure invalid values are handled (i.e. where filter not determined)
 
     #merge and output to file 
     for recName in RecNames(objectifys) do
-        if(not(IsBound(declaredOperations.(recName)))) then
+        #TODO: handle other cases
+        if(not(IsBound(declaredOperations.(recName))) or not(objectifys.(recName).type = "InstallMethod")) then
             continue;
         fi;
 
-        AppendTo(outputDest, "MitM_DeclareConstructor( \"", recName, "\", ",
-                 declaredOperations.(recName).inputFilters, ", ");
+        i := 1;
+        AppendTo(outputDest, "MitM_DeclareConstructor( \"MitM_", recName, "\", [");
+        while (i <= Length(declaredOperations.(recName).inputFilters)) do
+                if(i > 1) then AppendTo(outputDest, ", "); fi;
+                AppendTo(outputDest,
+                   declaredOperations.(recName).inputFilters[i]);
+                i := i + 1;
+        od;
+        AppendTo(outputDest, "], ");
         
         i := 1;
-        while (i <= Length(objectifys.(recName))) do
+        while (i <= Length(objectifys.(recName).commonFilters)) do
             if(i > 1) then
                 AppendTo(outputDest, " and ");
             fi;
-            AppendTo(outputDest, objectifys.(recName)[i]);
+            AppendTo(outputDest, objectifys.(recName).commonFilters[i]);
             i := i + 1;
         od;
 
         AppendTo(outputDest, ");\n");
+        
+        i := 1;
+        while (i <= Length(objectifys.(recName).inputFilters)) do
+            #for each of the installed methods output wrapper call
+            AppendTo(outputDest, "MitM_InstallMethod( MitM_", recName, ", ",
+                    printListOfStrings(unwrapFilters(objectifys.(recName).inputFilters[i])),
+                    ", function (arg...) return CallFuncList( ", recName,
+                    " , arg); end);\n");
+            i := i + 1;
+        od;
+        AppendTo(outputDest, "\n");
     od; 
 end;
+
+#FOR TESTING:
+#gap> #Group([ (1,2,3), (1,2) ])
+#gap> #RightCoset(Group([ (1,2,3), (1,2) ]),(1,2))
+#gap> #TODO: put this in function below
+declareOperationsCaller := 
+function()
+    local fileDec, fileImpl, stringDec, stringImpl, recordDec, recordImpl, g, r;
+
+    fileDec := IO_File("json_output/csetgrp.gd.json");
+    fileImpl := IO_File("json_output/csetgrp.gi.json");
+    stringDec := IO_ReadUntilEOF(fileDec);;
+    stringImpl := IO_ReadUntilEOF(fileImpl);;
+    recordDec := JsonStringToGap(stringDec);;
+    recordImpl := JsonStringToGap(stringImpl);;
+    declareOperations(recordDec, recordImpl, "test.gd");
+
+#    Read("mitm.g");
+#    Read("MitM_OM.gd");
+#        Read("test.gd");
+end;
+
+test :=
+function()
+    local g, r;
+
+    g := MitM_GroupWithGenerators([(1,2,3),(1,2)]);
+    r := MitM_RightCoset(g, (1,2));
+    Print(MitM_OM(g));
+end;
+
 
 #for each InstallMethod write MitM_InstallMethod(same signature...)
 createMitM_InstallMethods :=
