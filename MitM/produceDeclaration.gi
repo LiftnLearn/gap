@@ -1,4 +1,4 @@
-Read("produceDeclaration.gd");
+Read("MitM/produceDeclaration.gd");
 
 unwrapFilters :=
 function(list)
@@ -137,8 +137,8 @@ function()
     stringImpl := IO_ReadUntilEOF(fileImpl);;
     recordDec := JsonStringToGap(stringDec);;
     recordImpl := JsonStringToGap(stringImpl);;
-    declareOperations(recordDec, recordImpl, "test.gd");
 
+    declareOperations(recordDec, recordImpl, "test.gd");
 end;
 
 

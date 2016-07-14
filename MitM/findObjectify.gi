@@ -1,4 +1,4 @@
-Read("findObjectify.gd");
+Read("MitM/findObjectify.gd");
 
 flattenToStrings :=
 function(root, flattenList)
@@ -120,42 +120,96 @@ function(identifier)
     return filters;
 end;
 
-#TODO: put handling of Objectify's in separate function
-#TODO: write header that describes how all these functions are related
+deduceInputFilters :=
+function(args)
+    local i, ans;
+
+    ans := [];
+
+    i := 1;
+    while( i < Length(args)) do
+        if(IsList(args[i]) and not(IsString(args[i]))) then
+            Add(ans, args[i]);
+        fi;
+        i := i + 1;
+    od;
+
+    return ans;
+end;
+
+handleFirstObjectify :=
+function(node, objectifys, constructorName, surroundingFunction)
+    local type, filterSubtree, filters;
+
+    filters := [];
+                    
+    if(node.name.identifier = "Objectify") then
+        type := node.args[1];
+    else #ObjectifyWithAttributes
+        type := node.args[2];
+    fi;
+
+    if(objectifys.(constructorName).type = "InstallMethod") then
+        Add(objectifys.(constructorName).inputFilters, deduceInputFilters(surroundingFunction.args));
+    fi;
+    
+    #case Objectify(NewType(..., filters), ...)
+    if(IsBound(type.type) and type.type = "functionCall"
+       and IsBound(type.name) and type.name.identifier = "NewType") then
+        filterSubtree := type.args[2];
+        filters := getFilterList(filterSubtree);
+
+    #case where we find a variable
+    elif(isVariable(type)) then
+        if(IsBound(type.subtype) and type.subtype = "RefLVar") then
+            filters := handleLocalVariable(surroundingFunction, type);
+        elif(IsBound(type.subtype) and type.subtype = "RefGVar") then
+            filters := handleGlobalVariable(type.identifier);
+        fi;
+    fi;
+
+    #if no proper filters could be deduced
+    if(Length(filters)=0) then
+        filters := ["IsObject"];
+    fi;
+
+    Add(objectifys.(constructorName).filters, filters);
+
+    return objectifys;
+end;
+
 #known bugs: 
 analyzeRecordForObjectifies :=
 function(obj)
-    local args, assignments, type, i, filterSubtree, statNode,
-      listOfAssignmentFilters, filters, objectifyFound, constructorName,
+    local type, i, filterSubtree, filters, objectifyFound, constructorName,
       node, line, surroundingFunction, surroundingFunctionLine,
       objectifyFunctionLine, objectifys;
 
     node := obj.node;
+    objectifyFound := false;
 
+    #initializing local variables
     if(not(IsBound(obj.surroundingFunction))) then
-        surroundingFunction := false; #is there some null equivalent in GAP?
+        line := 1;
+        objectifys := rec();
+        surroundingFunction := rec();
         surroundingFunctionLine := 1;
         objectifyFunctionLine := 1;
-        objectifys := rec();
-        line := 1;
     else
+        line := obj.line;
+        objectifys := obj.objectifys;
         surroundingFunction := obj.surroundingFunction;
         surroundingFunctionLine := obj.surroundingFunctionLine;
         objectifyFunctionLine := obj.objectifyFunctionLine;
-        objectifys := obj.objectifys;
-        line := obj.line;
     fi;
 
-    filters := [];
-    objectifyFound := false;
-
+    #update metadata
     if(IsBound(node.type) and node.type = "debugInfo") then
         line := node.line;
-        statNode := node.stat;
 
         #cache a surrounding function if one is found
-        if (isSurroundingFunction(statNode)) then
-            surroundingFunction := statNode; 
+        if (isSurroundingFunction(node.stat)) then
+            surroundingFunction := node.stat; 
             surroundingFunctionLine := node.line;
         fi;
 
@@ -169,67 +223,20 @@ function(obj)
             objectifys.(constructorName) := rec();
             objectifys.(constructorName).multipleObjectifiesFlag := false;
             objectifys.(constructorName).inputFilters := [];
+            objectifys.(constructorName).filters := [];
         fi;
-
         
         #first Objectify call within surrounding function
         if(not(objectifyFunctionLine = surroundingFunctionLine)) then
             objectifyFunctionLine := surroundingFunctionLine;
             objectifys.(constructorName).type := surroundingFunction.name.identifier;
-                    
-            if(node.name.identifier = "Objectify") then
-                type := node.args[1];
-            else #ObjectifyWithAttributes
-                type := node.args[2];
-            fi;
 
-            if(objectifys.(constructorName).type = "InstallMethod") then
-                i := 1;
-                while( i < Length(surroundingFunction.args)) do
-                    if(IsList(surroundingFunction.args[i]) and not(IsString(surroundingFunction.args[i]))) then
-                        Add(objectifys.(constructorName).inputFilters, surroundingFunction.args[i]);
-                    fi;
-                    i := i + 1;
-                od;
-            fi;
-
-
-            #case Objectify(NewType(..., filters), ...)
-            if (IsBound(type.type)
-              and type.type = "functionCall"
-              and IsBound(type.name) and type.name.identifier = "NewType") then
-                filterSubtree := type.args[2];
-                filters := getFilterList(filterSubtree);
-
-            #case where we find a variable
-            elif(isVariable(type)) then
-                if(IsBound(type.subtype)
-                  and type.subtype = "RefLVar") then
-                    filters := handleLocalVariable(surroundingFunction, type);
-                elif(IsBound(type.subtype)
-                  and type.subtype = "RefGVar") then
-                    filters := handleGlobalVariable(type.identifier);
-                fi;
-            fi;
-
-            #if no proper filters could be deduced
-            if(objectifyFound = true and Length(filters)=0) then
-                filters := ["IsObject"];
-            fi;
-
-            if(IsBound(objectifys.(constructorName).filters)) then
-                Add(objectifys.(constructorName).filters, filters);
-            else
-                objectifys.(constructorName).filters := [filters];
-            fi;
-
+            objectifys := handleFirstObjectify(node, objectifys, constructorName, surroundingFunction);
         else #multiple Objectify calls within single function
             objectifys.(constructorName).multipleObjectifiesFlag := true;
-
             objectifys.(constructorName).filters := ["IsObject"];
         fi;
     fi;
-
     
     return rec(line := line, surroundingFunction := surroundingFunction,
       surroundingFunctionLine := surroundingFunctionLine,

@@ -100,6 +100,35 @@ findLocalAssignments := function(surroundingFunction, identifier) end;
 handleGlobalVariable := function(identifier) end;
 
 #########################################################################
+# deduceInputFilters 
+#
+# function(args)
+# 
+# Function that takes a list of arguments and returns the one which
+# denotes the inputFilters used by the method selection.
+#
+# args : list of arguments to be searched for inputFilters
+#
+#########################################################################
+deduceInputFilters := function(args) end;
+
+#########################################################################
+# handleFirstObjectify
+#
+# function(node, objectifys, constructorName)
+# 
+# Function that finds the used filters within an Objectify call if possible.
+#
+# node : current node being analyzed from syntax tree
+# objectifys : collection-object containing already found objectifies
+# constructorName : name of method/function being installed
+# surroundingFunction : function surrounding node
+#
+#########################################################################
+handleFirstObjectify := function(node, objectifys,
+                        constructorName, surroundingFunction) end;
+
+#########################################################################
 # analyzeRecordForObjectifies
 #
 # function(obj)

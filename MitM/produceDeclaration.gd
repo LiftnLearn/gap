@@ -1,4 +1,4 @@
-Read("findObjectify.gi");
+Read("MitM/findObjectify.gi");
 
 isDeclareOperation :=
 function(node)
@@ -11,6 +11,9 @@ end;
 # function(list)
 #
 # Gets a list of filter-records and returns a string representing it nicely
+#
+# Example: [rec(...HasSize...IsObject), rec(IsObject...)] ->
+#          ["HasSize and IsObject", "IsObject"]
 #
 # list: list of filter-records
 #
