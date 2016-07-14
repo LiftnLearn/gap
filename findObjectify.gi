@@ -1,4 +1,4 @@
-LoadPackage("json");
+Read("findObjectify.gd");
 
 flattenToStrings :=
 function(root, flattenList)
@@ -18,10 +18,6 @@ function(root, flattenList)
 end;
 
 
-#idea: first fully flatten the tree and then simply look at all
-#       strings if they are filters, then append them
-#TODO: can filters be combined differently than just with AND -> 
-#       would need more sophisticated algorithm
 getFilterList :=
 function(root)
     local filterList, flattenedList, i; 
@@ -30,9 +26,10 @@ function(root)
     flattenedList := [];
     flattenToStrings(root, flattenedList);
 
+    #check for each string if it is a filter
     filterList := [];
     for i in flattenedList do
-        if(IsBoundGlobal(i) and IsFilter(ValueGlobal(i))) then
+        if(IsBoundGlobal(i) and (IsObject = ValueGlobal(i) or IsFilter(ValueGlobal(i)))) then
             Add(filterList, i);
         fi;
     od;
@@ -68,7 +65,7 @@ function(surroundingFunction, identifier)
     assignments := []; 
     for r in records do
         if(IsBound(r.type) and r.type = "assign"
-          and IsBound(r.left) and r.left = "K") then
+          and IsBound(r.left) and r.left = identifier) then
             Add(assignments, r);
         fi;
     od;
@@ -76,39 +73,7 @@ function(surroundingFunction, identifier)
     return assignments;
 end;
 
-isFunctionCall :=
-function(node)
-    return (IsRecord(node)
-      and IsBound(node.type)
-      and node.type = "functionCall");
-end;
 
-isSurroundingFunction :=
-function(statNode)
-    return (isFunctionCall(statNode) and (statNode.name.identifier = "InstallMethod" 
-      or statNode.name.identifier = "InstallOtherMethod"
-      or statNode.name.identifier = "InstallGlobalFunction"
-      or statNode.name.identifier = "BindGlobal"));
-end;
-
-isObjectify :=
-function(node)
-    return (IsBound(node.type)
-      and node.type = "functionCall"
-      and IsBound(node.name)
-      and IsBound(node.name.identifier)
-      and (node.name.identifier = "Objectify"
-      or node.name.identifier = "ObjectifyWithAttributes"));
-end;
-
-isVariable :=
-function(type)
-    return IsRecord(type) and IsBound(type.type)
-      and type.type = "variable";
-end;
-
-#TODO: as the functions are in local scope it doesn't
-#help to pass variables, does it?
 handleLocalVariable :=
 function(surroundingFunction, type)
     local assignments, i, listOfAssignmentFilters, filters;
@@ -137,16 +102,16 @@ function(surroundingFunction, type)
 end;
 
 handleGlobalVariable :=
-function(type)
+function(identifier)
     local filterIDs, filters, i;
 
     filters := [];
 
-    if(IsBoundGlobal(type.identifier)
-      and IsType(ValueGlobal(type.identifier))) then
+    if(IsBoundGlobal(identifier)
+      and IsType(ValueGlobal(identifier))) then
         #return all filters of this type
 
-        filterIDs := TRUES_FLAGS(ValueGlobal(type.identifier)![2]);
+        filterIDs := TRUES_FLAGS(ValueGlobal(identifier)![2]);
         for i in filterIDs do
             Add(filters, NameFunction(FILTERS[i]));
         od;
@@ -158,7 +123,7 @@ end;
 #TODO: put handling of Objectify's in separate function
 #TODO: write header that describes how all these functions are related
 #known bugs: 
-handleRecord :=
+analyzeRecordForObjectifies :=
 function(obj)
     local args, assignments, type, i, filterSubtree, statNode,
       listOfAssignmentFilters, filters, objectifyFound, constructorName,
@@ -243,7 +208,7 @@ function(obj)
                     filters := handleLocalVariable(surroundingFunction, type);
                 elif(IsBound(type.subtype)
                   and type.subtype = "RefGVar") then
-                    filters := handleGlobalVariable(type);
+                    filters := handleGlobalVariable(type.identifier);
                 fi;
             fi;
 
@@ -325,193 +290,9 @@ function(obj, recordHandler)
     return temp;
 end;
 
-isDeclareOperation :=
-function(node)
-    return (isFunctionCall(node) and node.name.identifier = "DeclareOperation");
-end;
 
 
-#list: list of filter-records
-#gets a list of filter-records and returns a string representing it nicely
-unwrapFilters :=
-function(list)
-    local i, j, ans, str, filterWithAND;
 
-    ans := [];
-
-    i := 1;
-    while (i <= Length(list)) do
-        str := "";
-        filterWithAND := getFilterList(list[i]);
-        if(Length(filterWithAND) = 0) then
-            filterWithAND := ["IsObject"];
-        fi;
-
-        j := 1;
-        while( j <= Length(filterWithAND)) do
-            if(j > 1) then
-                str := Concatenation(str, " and ");
-            fi;
-            str := Concatenation(str, filterWithAND[j]);
-            j := j + 1;
-        od;
-        Add(ans, str);
-        i := i + 1;
-    od;
-
-    return ans;
-end;
-
-printListOfStrings :=
-function(list)
-    local i, str;
-    i := 1;
-    str := "[";
-
-    while(i <= Length(list)) do
-        if( i > 1) then str := Concatenation(str, ", "); fi;
-        str := Concatenation(str, list[i]);
-        i := i + 1;
-    od;
-    
-    str := Concatenation(str, "]");
-    return str;
-end;
-
-
-declareOperationHandler :=
-function(obj)
-    local node, declaredOperations, declaredOperation, i;
-
-    if(not(IsBound(obj.declaredOperations))) then
-        declaredOperations := rec();
-    else
-        declaredOperations := obj.declaredOperations;
-    fi;
-
-    node := obj.node;
-
-    if(isDeclareOperation(node)) then 
-        declaredOperation := rec();
-        declaredOperation.name := node.args[1];
-        declaredOperation.inputFilters := unwrapFilters(node.args[2]);
-
-        declaredOperations.(declaredOperation.name) := declaredOperation; 
-    fi;
-
-    return rec(declaredOperations := declaredOperations);
-end;
-
-processJson := 
-function(record)
-    return traverseJsonRecordDriver(record, handleRecord).objectifys;
-end;
-
-#headerRec : record that represents the original declaration-file (*.gd)
-#implementRec : record that represents the original declaration-file (*.gi)
-#outputDest : path to which to write new declaration-file
-#This function produces a declaration file containing the MitM-constructors
-# and InstallMethods that save the arguments used to create objects.
-#
-#pseudocode
-#for each DeclareOperation write MitM_DeclareConstructor(operationName, 
-#[inputFilters...], outputFilters(expand using AND));
-
-#TODO: find out what happened to DoubleCoset
-#TODO: make sure invalid values are handled (i.e. where filter not determined)
-declareOperations :=
-function(headerRec, implementRec, outputDest)
-    local objectifys, declaredOperations, recName, i;
-
-    #initialize output-file
-    PrintTo(outputDest, "");
- 
-    objectifys := processJson(implementRec); #TODO: rename this, these are not actually objectifys anymore
-
-    declaredOperations := traverseJsonRecordDriver(headerRec,
-                            declareOperationHandler).declaredOperations;
-
-    #Print(objectifys, declaredOperations);
-    for recName in RecNames(objectifys) do
-        objectifys.(recName).commonFilters := Intersection(objectifys.(recName).filters);
-    od;
-
-    #merge and output to file 
-    for recName in RecNames(objectifys) do
-        #TODO: handle other cases
-        if(not(IsBound(declaredOperations.(recName))) or not(objectifys.(recName).type = "InstallMethod")) then
-            continue;
-        fi;
-
-        i := 1;
-        AppendTo(outputDest, "MitM_DeclareConstructor( \"MitM_", recName, "\", [");
-        while (i <= Length(declaredOperations.(recName).inputFilters)) do
-                if(i > 1) then AppendTo(outputDest, ", "); fi;
-                AppendTo(outputDest,
-                   declaredOperations.(recName).inputFilters[i]);
-                i := i + 1;
-        od;
-        AppendTo(outputDest, "], ");
-        
-        i := 1;
-        while (i <= Length(objectifys.(recName).commonFilters)) do
-            if(i > 1) then
-                AppendTo(outputDest, " and ");
-            fi;
-            AppendTo(outputDest, objectifys.(recName).commonFilters[i]);
-            i := i + 1;
-        od;
-
-        AppendTo(outputDest, ");\n");
-        
-        i := 1;
-        while (i <= Length(objectifys.(recName).inputFilters)) do
-            #for each of the installed methods output wrapper call
-            AppendTo(outputDest, "MitM_InstallMethod( MitM_", recName, ", ",
-                    printListOfStrings(unwrapFilters(objectifys.(recName).inputFilters[i])),
-                    ", function (arg...) return CallFuncList( ", recName,
-                    " , arg); end);\n");
-            i := i + 1;
-        od;
-        AppendTo(outputDest, "\n");
-    od; 
-end;
-
-#FOR TESTING:
-#gap> #Group([ (1,2,3), (1,2) ])
-#gap> #RightCoset(Group([ (1,2,3), (1,2) ]),(1,2))
-#gap> #TODO: put this in function below
-declareOperationsCaller := 
-function()
-    local fileDec, fileImpl, stringDec, stringImpl, recordDec, recordImpl, g, r;
-
-    fileDec := IO_File("json_output/csetgrp.gd.json");
-    fileImpl := IO_File("json_output/csetgrp.gi.json");
-    stringDec := IO_ReadUntilEOF(fileDec);;
-    stringImpl := IO_ReadUntilEOF(fileImpl);;
-    recordDec := JsonStringToGap(stringDec);;
-    recordImpl := JsonStringToGap(stringImpl);;
-    declareOperations(recordDec, recordImpl, "test.gd");
-
-#    Read("mitm.g");
-#    Read("MitM_OM.gd");
-#        Read("test.gd");
-end;
-
-test :=
-function()
-    local g, r;
-
-    g := MitM_GroupWithGenerators([(1,2,3),(1,2)]);
-    r := MitM_RightCoset(g, (1,2));
-    Print(MitM_OM(g));
-end;
-
-
-#for each InstallMethod write MitM_InstallMethod(same signature...)
-createMitM_InstallMethods :=
-function()
-end;
 
 #convenience function to analyze all files for objectify calls
 #TODO: make path to JSON files configurable, as well as name of output file
@@ -538,4 +319,3 @@ end;
 #       declareConstructors(record, dest);;
 #    od;
 #end;
-
