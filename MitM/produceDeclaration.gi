@@ -8,9 +8,7 @@ function(list, separator)
 
     i := 1;
     while (i <= Length(list)) do
-        if(i > 1) then
-            str := Concatenation(str, separator);
-        fi;
+        if(i > 1) then str := Concatenation(str, separator); fi;
         str := Concatenation(str, list[i]);
         i := i + 1;
     od;

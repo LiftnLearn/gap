@@ -9,10 +9,9 @@ end;
 
 isSurroundingFunction :=
 function(statNode)
-    return (isFunctionCall(statNode) and (statNode.name.identifier = "InstallMethod" 
-      or statNode.name.identifier = "InstallOtherMethod"
-      or statNode.name.identifier = "InstallGlobalFunction"
-      or statNode.name.identifier = "BindGlobal"));
+    return (isFunctionCall(statNode) and (statNode.name.identifier in
+      ["InstallMethod", "InstallOtherMethod", "InstallGlobalFunction",
+       "BindGlobal"]));
 end;
 
 isObjectify :=

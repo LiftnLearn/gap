@@ -149,7 +149,7 @@ function(node, objectifys, constructorName, surroundingFunction)
         type := node.args[2];
     fi;
 
-    if(objectifys.(constructorName).type = "InstallMethod") then
+    if(objectifys.(constructorName).type in ["InstallMethod"]) then
         Add(objectifys.(constructorName).inputFilters, deduceInputFilters(surroundingFunction.args));
     fi;
     
