@@ -6,6 +6,21 @@ function(node)
 end;
 
 #########################################################################
+# printListWithSeparator
+#
+# function(list, separator)
+#
+# Gets a list of filters and returns a string representing it nicely
+#
+# Example: ([HasSize, IsObject], ", ") -> "HasSize, IsObject"
+#
+# list: list
+# separator : string to be inserted between list elements
+#
+#########################################################################
+connectFiltersWithAnd := function(list, separator) end;
+
+#########################################################################
 # unwrapFilters
 #
 # function(list)
@@ -21,18 +36,45 @@ end;
 unwrapFilters := function(list) end;
 
 #########################################################################
-# printListOfStrings
+# outputConstructor
 #
-# function(list)
+# function(recName, inputFilters, resultFilters)
 #
-# Gets a list of strings and returns a string representing it nicely.
+# Convenience function for outputting MitM_Constructors.
 #
-# Example: ["This", "is", "an", "example"] -> [This, is, an, example]
-#
-# list: list of strings
+# recName : name of the function in the original constructor
+# inputFilters : list of filters for input object
+# resultFilters : filters that output object will adhere to
 #
 #########################################################################
-printListOfStrings := function(list) end;
+outputConstructor := function(recName, inputFilters, resultFilters) end;
+
+#########################################################################
+# outputInstallMethods
+#
+# function(recName, inputFilters)
+#
+# Convenience function for outputting MitM_InstallMethods.
+#
+# recName : name of the function in the original constructor
+# inputFilters : list of filters for input object (used in method selection)
+#
+#########################################################################
+outputInstallMethods := function(recName, inputFilters) end;
+
+#########################################################################
+# mergeAndOutputToFile
+#
+# function(objectifys, declareOperations, outputDest);
+#
+# Does the final processing and outputs the actual declaration file.
+#
+# objectifys: record collecting all objectify calls in .gi file
+# declareOperations : record collecting all declared operations in .gd file
+# outputDest : path to output destinationn
+#
+#########################################################################
+mergeAndOutputToFile := function(objectifys, declareOperations, outputDest) end;
 
 #########################################################################
 # declareOperationHandler

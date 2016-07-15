@@ -129,7 +129,7 @@ function(args)
     i := 1;
     while( i < Length(args)) do
         if(IsList(args[i]) and not(IsString(args[i]))) then
-            Add(ans, args[i]);
+            Append(ans, args[i]);
         fi;
         i := i + 1;
     od;

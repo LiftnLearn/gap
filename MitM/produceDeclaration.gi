@@ -1,47 +1,39 @@
 Read("MitM/produceDeclaration.gd");
 
+printListWithSeparator :=
+function(list, separator)
+    local i, str;
+
+    str := "";
+
+    i := 1;
+    while (i <= Length(list)) do
+        if(i > 1) then
+            str := Concatenation(str, separator);
+        fi;
+        str := Concatenation(str, list[i]);
+        i := i + 1;
+    od;
+
+    return str;
+end;
+
+#TODO: just use some sort of fold?
 unwrapFilters :=
 function(list)
-    local i, j, ans, str, filterWithAND;
+    local i, ans, filterWithAnd;
 
     ans := [];
 
     i := 1;
     while (i <= Length(list)) do
-        str := "";
-        filterWithAND := getFilterList(list[i]);
-
-        j := 1;
-        while( j <= Length(filterWithAND)) do
-            if(j > 1) then
-                str := Concatenation(str, " and ");
-            fi;
-            str := Concatenation(str, filterWithAND[j]);
-            j := j + 1;
-        od;
-        Add(ans, str);
+        filterWithAnd := getFilterList(list[i]);
+        Add(ans, printListWithSeparator(filterWithAnd, " and "));
         i := i + 1;
     od;
 
     return ans;
 end;
-
-printListOfStrings :=
-function(list)
-    local i, str;
-    i := 1;
-    str := "[";
-
-    while(i <= Length(list)) do
-        if( i > 1) then str := Concatenation(str, ", "); fi;
-        str := Concatenation(str, list[i]);
-        i := i + 1;
-    od;
-    
-    str := Concatenation(str, "]");
-    return str;
-end;
-
 
 declareOperationHandler :=
 function(obj)
@@ -66,6 +58,55 @@ function(obj)
     return rec(declaredOperations := declaredOperations);
 end;
 
+outputConstructor :=
+function(recName, inputFilters, resultFilters)
+    local i, str;
+
+    str := Concatenation("MitM_DeclareConstructor( \"MitM_", recName, "\", ");
+    str := Concatenation(str, "[", printListWithSeparator(inputFilters, ", "), "], ");
+
+    str := Concatenation(str, printListWithSeparator(resultFilters, " and "), ");\n");
+
+    return str;
+end;
+
+outputInstallMethods :=
+function(recName, inputFilters)
+    local i, str;
+
+    str := "";
+
+    i := 1;
+    while (i <= Length(inputFilters)) do
+        #for each of the installed methods output wrapper call
+        str := Concatenation(str, "MitM_InstallMethod( MitM_", recName, ", [",
+                printListWithSeparator(unwrapFilters(inputFilters[i]), ", "),
+                "], function (arg...) return CallFuncList( ", recName,
+                " , arg); end);\n");
+        i := i + 1;
+    od;
+    str := Concatenation(str, "\n");
+
+    return str;
+end;
+
+mergeAndOutputToFile :=
+function(objectifys, declaredOperations, outputDest)
+    local i, recName;
+
+    for recName in RecNames(objectifys) do
+        #TODO: handle other cases
+        if(not(IsBound(declaredOperations.(recName))) or not(objectifys.(recName).type = "InstallMethod")) then
+            continue;
+        fi;
+
+        AppendTo(outputDest, outputConstructor(recName,
+            declaredOperations.(recName).inputFilters,
+            objectifys.(recName).commonFilters));
+
+        AppendTo(outputDest, outputInstallMethods(recName, objectifys.(recName).inputFilters));
+    od; 
+end;
 
 #TODO: find out what happened to DoubleCoset -> has an InstallOtherMethod call
 #TODO: make sure invalid values are handled (i.e. where filter not determined)
@@ -81,50 +122,14 @@ function(headerRec, implementRec, outputDest)
     declaredOperations := traverseJsonRecordDriver(headerRec,
                             declareOperationHandler).declaredOperations;
 
-    #Print(objectifys, declaredOperations);
     for recName in RecNames(objectifys) do
         objectifys.(recName).commonFilters := Intersection(objectifys.(recName).filters);
+        if(Length(objectifys.(recName).commonFilters) = 0) then
+            objectifys.(recName).commonFilters := [IsObject];
+        fi;
     od;
 
-    #merge and output to file 
-    for recName in RecNames(objectifys) do
-        #TODO: handle other cases
-        if(not(IsBound(declaredOperations.(recName))) or not(objectifys.(recName).type = "InstallMethod")) then
-            continue;
-        fi;
-
-        i := 1;
-        AppendTo(outputDest, "MitM_DeclareConstructor( \"MitM_", recName, "\", [");
-        while (i <= Length(declaredOperations.(recName).inputFilters)) do
-                if(i > 1) then AppendTo(outputDest, ", "); fi;
-                AppendTo(outputDest,
-                   declaredOperations.(recName).inputFilters[i]);
-                i := i + 1;
-        od;
-        AppendTo(outputDest, "], ");
-        
-        i := 1;
-        while (i <= Length(objectifys.(recName).commonFilters)) do
-            if(i > 1) then
-                AppendTo(outputDest, " and ");
-            fi;
-            AppendTo(outputDest, objectifys.(recName).commonFilters[i]);
-            i := i + 1;
-        od;
-
-        AppendTo(outputDest, ");\n");
-        
-        i := 1;
-        while (i <= Length(objectifys.(recName).inputFilters)) do
-            #for each of the installed methods output wrapper call
-            AppendTo(outputDest, "MitM_InstallMethod( MitM_", recName, ", ",
-                    printListOfStrings(unwrapFilters(objectifys.(recName).inputFilters[i])),
-                    ", function (arg...) return CallFuncList( ", recName,
-                    " , arg); end);\n");
-            i := i + 1;
-        od;
-        AppendTo(outputDest, "\n");
-    od; 
+    mergeAndOutputToFile(objectifys, declaredOperations, outputDest);
 end;
 
 declareOperationsCaller := 
