@@ -69,7 +69,7 @@ function(recName, inputFilters, resultFilters)
 end;
 
 outputInstallMethods :=
-function(recName, inputFilters)
+function(recName, inputFilters, wrapperName)
     local i, str;
 
     str := "";
@@ -77,7 +77,7 @@ function(recName, inputFilters)
     i := 1;
     while (i <= Length(inputFilters)) do
         #for each of the installed methods output wrapper call
-        str := Concatenation(str, "MitM_InstallMethod( MitM_", recName, ", [",
+        str := Concatenation(str, wrapperName, "( MitM_", recName, ", [",
                 printListWithSeparator(unwrapFilters(inputFilters[i]), ", "),
                 "], function (arg...) return CallFuncList( ", recName,
                 " , arg); end);\n");
@@ -92,17 +92,26 @@ mergeAndOutputToFile :=
 function(objectifys, declaredOperations, outputDest)
     local i, recName;
 
+    Print(objectifys);
     for recName in RecNames(objectifys) do
-        #TODO: handle other cases
-        if(not(IsBound(declaredOperations.(recName))) or not(objectifys.(recName).type = "InstallMethod")) then
-            continue;
+        if (objectifys.(recName).type = "BindGlobal") then
+            ;
+        elif (objectifys.(recName).type = "InstallGlobalFunction") then
+            #what about filters?
+            AppendTo(outputDest, "MitM_DeclareGlobalFunction(\"", recName, "\");\n");
+            AppendTo(outputDest, "MitM_InstallGlobalFunction(",
+             recName, ", function (arg...) return CallFuncList( ",
+             recName, ", arg); end);\n");
+        elif(IsBound(declaredOperations.(recName))) then
+            AppendTo(outputDest, outputConstructor(recName,
+                declaredOperations.(recName).inputFilters,
+                objectifys.(recName).commonFilters));
+
+            AppendTo(outputDest, outputInstallMethods(recName, 
+                objectifys.(recName).inputFilters.InstallMethod, "MitM_InstallMethod"));
+            AppendTo(outputDest, outputInstallMethods(recName,
+                objectifys.(recName).inputFilters.InstallOtherMethod, "MitM_InstallOtherMethod"));
         fi;
-
-        AppendTo(outputDest, outputConstructor(recName,
-            declaredOperations.(recName).inputFilters,
-            objectifys.(recName).commonFilters));
-
-        AppendTo(outputDest, outputInstallMethods(recName, objectifys.(recName).inputFilters));
     od; 
 end;
 

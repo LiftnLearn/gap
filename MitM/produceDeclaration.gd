@@ -58,9 +58,11 @@ outputConstructor := function(recName, inputFilters, resultFilters) end;
 #
 # recName : name of the function in the original constructor
 # inputFilters : list of filters for input object (used in method selection)
+# wrapperName : name of the wrapper to be called (i.e. either MitM_InstallMethod
+#               or MitM_InstallOtherMethod)
 #
 #########################################################################
-outputInstallMethods := function(recName, inputFilters) end;
+outputInstallMethods := function(recName, inputFilters, wrapperName) end;
 
 #########################################################################
 # mergeAndOutputToFile

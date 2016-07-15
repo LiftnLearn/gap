@@ -149,8 +149,9 @@ function(node, objectifys, constructorName, surroundingFunction)
         type := node.args[2];
     fi;
 
-    if(objectifys.(constructorName).type in ["InstallMethod"]) then
-        Add(objectifys.(constructorName).inputFilters, deduceInputFilters(surroundingFunction.args));
+    if(objectifys.(constructorName).type in ["InstallMethod", "InstallOtherMethod"] ) then
+        Add(objectifys.(constructorName).inputFilters.(objectifys.(constructorName).type),
+            deduceInputFilters(surroundingFunction.args));
     fi;
     
     #case Objectify(NewType(..., filters), ...)
@@ -222,7 +223,9 @@ function(obj)
         if(not(IsBound(objectifys.(constructorName)))) then
             objectifys.(constructorName) := rec();
             objectifys.(constructorName).multipleObjectifiesFlag := false;
-            objectifys.(constructorName).inputFilters := [];
+            objectifys.(constructorName).inputFilters := rec();
+            objectifys.(constructorName).inputFilters.InstallMethod := [];
+            objectifys.(constructorName).inputFilters.InstallOtherMethod := [];
             objectifys.(constructorName).filters := [];
         fi;
         
