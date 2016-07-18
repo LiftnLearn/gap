@@ -12,7 +12,7 @@ GAC="`find $GAP_DIR -name \"gac\"`"
 
 DEST="$GAP_DIR/json_output"
 
-for file in $GAP_DIR/lib/*.gi
+for file in $GAP_DIR/lib/*.gd $GAP_DIR/lib/*.gi
 do 
 
   filename=${file##*/}

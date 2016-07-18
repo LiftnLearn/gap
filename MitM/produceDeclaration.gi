@@ -56,6 +56,19 @@ function(obj)
     return rec(declaredOperations := declaredOperations);
 end;
 
+outputGlobalFunctions :=
+function(funcName)
+    local str;
+
+    #what about filters?
+    str := Concatenation("MitM_DeclareGlobalFunction(\"", funcName, "\");\n");
+    str := Concatenation(str, "MitM_InstallGlobalFunction(",
+        funcName, ", function (arg...) return CallFuncList( ",
+        funcName, ", arg); end);\n");
+
+    return str;
+end;
+
 outputConstructor :=
 function(recName, inputFilters, resultFilters)
     local i, str;
@@ -92,16 +105,11 @@ mergeAndOutputToFile :=
 function(objectifys, declaredOperations, outputDest)
     local i, recName;
 
-    Print(objectifys);
     for recName in RecNames(objectifys) do
         if (objectifys.(recName).type = "BindGlobal") then
             ;
         elif (objectifys.(recName).type = "InstallGlobalFunction") then
-            #what about filters?
-            AppendTo(outputDest, "MitM_DeclareGlobalFunction(\"", recName, "\");\n");
-            AppendTo(outputDest, "MitM_InstallGlobalFunction(",
-             recName, ", function (arg...) return CallFuncList( ",
-             recName, ", arg); end);\n");
+            AppendTo(outputDest, outputGlobalFunctions(recName));
         elif(IsBound(declaredOperations.(recName))) then
             AppendTo(outputDest, outputConstructor(recName,
                 declaredOperations.(recName).inputFilters,
@@ -140,11 +148,11 @@ function(headerRec, implementRec, outputDest)
 end;
 
 declareOperationsCaller := 
-function()
-    local fileDec, fileImpl, stringDec, stringImpl, recordDec, recordImpl, g, r;
+function(fileDec, fileImpl)
+    local stringDec, stringImpl, recordDec, recordImpl, g, r;
 
-    fileDec := IO_File("json_output/csetgrp.gd.json");
-    fileImpl := IO_File("json_output/csetgrp.gi.json");
+    fileDec := IO_File(Concatenation("json_output/", fileDec));#csetgrp.gd.json");
+    fileImpl := IO_File(Concatenation("json_output/", fileImpl));#csetgrp.gi.json");
     stringDec := IO_ReadUntilEOF(fileDec);;
     stringImpl := IO_ReadUntilEOF(fileImpl);;
     recordDec := JsonStringToGap(stringDec);;

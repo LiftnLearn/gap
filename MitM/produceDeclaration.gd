@@ -38,6 +38,18 @@ unwrapFilters := function(list) end;
 #########################################################################
 # outputConstructor
 #
+# function(funcName)
+#
+# Convenience function for formatting output for global functions
+#
+# funcName : name of global function to be wrapped
+#
+#########################################################################
+outputGlobalFunctions := function(funcName) end;
+ 
+#########################################################################
+# outputConstructor
+#
 # function(recName, inputFilters, resultFilters)
 #
 # Convenience function for outputting MitM_Constructors.
