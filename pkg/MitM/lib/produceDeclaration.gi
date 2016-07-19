@@ -1,5 +1,3 @@
-Read("MitM/produceDeclaration.gd");
-
 printListWithSeparator :=
 function(list, separator)
     local i, str;

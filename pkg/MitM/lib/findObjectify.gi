@@ -1,5 +1,3 @@
-Read("MitM/findObjectify.gd");
-
 flattenToStrings :=
 function(root, flattenList)
     local i;

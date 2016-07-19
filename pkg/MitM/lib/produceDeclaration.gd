@@ -1,5 +1,3 @@
-Read("MitM/findObjectify.gi");
-
 isDeclareOperation :=
 function(node)
     return (isFunctionCall(node) and node.name.identifier = "DeclareOperation");

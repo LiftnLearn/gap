@@ -1,4 +1,4 @@
-LoadPackage("json");;
+LoadPackage("json", false);;
 
 isFunctionCall :=
 function(node)

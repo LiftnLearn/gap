@@ -28,9 +28,6 @@ ReadLib( "monoid.gd"   );
 ReadLib( "grp.gd"      );
 ReadLib( "invsgp.gd"   );
 
-#include for Math in the Middle
-ReadLib( "MitM.g"      );
-
 ReadLib( "addmagma.gd" );
 ReadLib( "addcoset.gd" );
 ReadLib( "semiring.gd" );

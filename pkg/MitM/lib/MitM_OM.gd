@@ -1,4 +1,4 @@
-LoadPackage("Openmath");
+LoadPackage("Openmath", false);
 
 #TestMethod for printing metadata of group construction in OMDoc
 #InstallMethod(MitM_OM, [IsGroup],
