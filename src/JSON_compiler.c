@@ -824,10 +824,6 @@ void            JSON_Emit (
 {
     Int                 narg;           /* number of arguments             */
     va_list             ap;             /* argument list pointer           */
-    Int                 dint;           /* integer argument                */
-    CVar                cvar;           /* C variable argument             */
-    Char *              string;         /* string argument                 */
-    const Char *        hex = "0123456789ABCDEF";
 
     /* are we in pass 2?                                                   */
     if ( JSON_CompPass != 2 )  return;
@@ -1332,7 +1328,7 @@ CVar JSON_CompAnd (
     CVar                val;            /* result                          */
     CVar                left;           /* left operand                    */
     CVar                right1;         /* right operand 1                 */
-    CVar                right2;         /* right operand 2                 */
+    CVar                right2 = 0;         /* right operand 2                 */
     Bag                 only_left;      /* info after evaluating only left */
 
     /* allocate a temporary for the result                                 */
@@ -4382,8 +4378,6 @@ void JSON_CompFor (
     CVar                last;           /* last  loop index                */
     CVar                lidx;           /* loop index variable             */
     CVar                elm;            /* element of list                 */
-    Int                 pass;           /* current pass                    */
-    Bag                 prev;           /* previous temp-info              */
     Int                 i;              /* loop variable                   */
 
     JSON_Emit( "{ \"type\":\"for\", \"var\":\"" );
@@ -4609,8 +4603,6 @@ void JSON_CompWhile (
     Stat                stat )
 {
     CVar                cond;           /* condition                       */
-    Int                 pass;           /* current pass                    */
-    Bag                 prev;           /* previous temp-info              */
     UInt                i;              /* loop variable                   */
 
     /* find an invariant temp-info                                         */
@@ -4667,8 +4659,6 @@ void JSON_CompRepeat (
     Stat                stat )
 {
     CVar                cond;           /* condition                       */
-    Int                 pass;           /* current pass                    */
-    Bag                 prev;           /* previous temp-info              */
     UInt                i;              /* loop variable                   */
 
     ///* find an invariant temp-info                                         */
@@ -5761,7 +5751,6 @@ void JSON_CompFunc (
     Bag                 info;           /* info bag for this function      */
     Int                 narg;           /* number of arguments             */
     Int                 nloc;           /* number of locals                */
-    Obj                 fexs;           /* function expression list        */
     Bag                 oldFrame;       /* old frame                       */
     Int                 i;              /* loop variable                   */
 
@@ -5846,8 +5835,6 @@ Int JSON_CompileFunc (
     Int                 magic1,
     Char *              magic2 )
 {
-    Int                 i;              /* loop variable                   */
-    Obj                 n;              /* temporary                       */
     UInt                col;
 
     /* open the output file                                                */
@@ -5929,8 +5916,8 @@ Obj JSON_FuncCOMPILE_FUNC (
     
     /* compile the function                                                */
     nr = JSON_CompileFunc(
-        CHARS_STRING(output), func, CHARS_STRING(name),
-        INT_INTOBJ(magic1), CHARS_STRING(magic2) );
+        (char*) CHARS_STRING(output), func, (char*) CHARS_STRING(name),
+        INT_INTOBJ(magic1), (char*) CHARS_STRING(magic2) );
 
 
     /* return the result                                                   */
