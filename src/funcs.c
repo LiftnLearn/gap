@@ -1327,14 +1327,14 @@ void            PrintProccall (
     Stat                call )
 {
     PrintFunccall( call );
-    //Pr( ";", 0L, 0L );
+    Pr( ";", 0L, 0L );
 }
 
 void            PrintProccallOpts (
     Stat                call )
 {
     PrintFunccallOpts( call );
-    //Pr( ";", 0L, 0L );
+    Pr( ";", 0L, 0L );
 }
 
 
@@ -1351,12 +1351,10 @@ static void            PrintFunccall1 (
 
     /* print the expression that should evaluate to a function             */
     Pr("%2>",0L,0L);
-    Emit("'name':'");
     PrintExpr( FUNC_CALL(call) );
-    Emit("', ");
 
     /* print the opening parenthesis                                       */
-    Pr("%<'args':[%>",0L,0L);
+    Pr("%<( %>",0L,0L);
 
     /* print the expressions that evaluate to the actual arguments         */
     for ( i = 1; i <= NARG_SIZE_CALL( SIZE_EXPR(call) ); i++ ) {
@@ -1376,7 +1374,7 @@ void            PrintFunccall (
   PrintFunccall1( call );
   
   /* print the closing parenthesis                                       */
-  Pr(" %2<]",0L,0L);
+  Pr(" %2<)",0L,0L);
 }
 
 

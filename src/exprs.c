@@ -1898,29 +1898,17 @@ void            PrintListExpr (
 void            PrintRangeExpr (
     Expr                expr )
 {
-    Emit( "{ 'type':'range' ");
-
     if ( SIZE_EXPR( expr ) == 2*sizeof(Expr) ) {
-       // Pr("%2>[ %2>",0L,0L);    PrintExpr( ADDR_EXPR(expr)[0] );
-       // Pr("%2< .. %2>",0L,0L);  PrintExpr( ADDR_EXPR(expr)[1] );
-       // Pr(" %4<]",0L,0L);
-       Pr("%2> 'first':'%2>",0L,0L);    PrintExpr( ADDR_EXPR(expr)[0] );
-       Pr("%2<', last':'%2>",0L,0L);  PrintExpr( ADDR_EXPR(expr)[1] );
-       //Pr("%4<', 'step':'1'",0L,0L);
+        Pr("%2>[ %2>",0L,0L);    PrintExpr( ADDR_EXPR(expr)[0] );
+        Pr("%2< .. %2>",0L,0L);  PrintExpr( ADDR_EXPR(expr)[1] );
+        Pr(" %4<]",0L,0L);
     }
     else {
-        //Pr("%2>[ %2>",0L,0L);    PrintExpr( ADDR_EXPR(expr)[0] );
-        //Pr("%<,%< %2>",0L,0L);   PrintExpr( ADDR_EXPR(expr)[1] );
-        //Pr("%2< .. %2>",0L,0L);  PrintExpr( ADDR_EXPR(expr)[2] );
-        //Pr(" %4<]",0L,0L);
-
-        Pr("%2> 'first':'%2>",0L,0L);    PrintExpr( ADDR_EXPR(expr)[0] );
-        Pr("%<', 'second':'%2>",0L,0L);   PrintExpr( ADDR_EXPR(expr)[1] );
-        Pr("%2<', 'last':'%2>",0L,0L);  PrintExpr( ADDR_EXPR(expr)[2]);// - ADDR_EXPR(expr)[0] );
-        Pr("%2<'",0L,0L);
+        Pr("%2>[ %2>",0L,0L);    PrintExpr( ADDR_EXPR(expr)[0] );
+        Pr("%<,%< %2>",0L,0L);   PrintExpr( ADDR_EXPR(expr)[1] );
+        Pr("%2< .. %2>",0L,0L);  PrintExpr( ADDR_EXPR(expr)[2] );
+        Pr(" %4<]",0L,0L);
     }
-
-    Emit( " } ");
 }
 
 
@@ -2182,7 +2170,7 @@ static StructInitInfo module = {
     0,                                  /* checkInit                      */
     0,                                  /* preSave                        */
     0,                                  /* postSave                       */
-    InitLibrary                         /* postRestore                    */
+    InitLibrary                                   /* postRestore                    */
 };
 
 StructInitInfo * InitInfoExprs ( void )
