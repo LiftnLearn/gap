@@ -39,6 +39,7 @@ SOURCE= \
     intfuncs \
     intrprtr \
     iostream \
+    JSON_compiler \
     listfunc \
     listoper \
     lists \

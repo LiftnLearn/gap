@@ -114,6 +114,7 @@ OBJECTS="\
     intfuncs.o \
     intrprtr.o \
     iostream.o \
+    JSON_compiler.o \
     listfunc.o \
     listoper.o \
     lists.o \

@@ -7,7 +7,7 @@
 **
 **
 *Y  Copyright (C)  1997,  Lehrstuhl D für Mathematik,  RWTH Aachen,  Germany
-*Y  (C) 1998 School Math and Comp. Sci., University of St Andrews, Scotland
+*Y  (C) 1998 School Math and JSON_Comp. Sci., University of St Andrews, Scotland
 *Y  Copyright (C) 2002 The GAP Group
 **
 **  This file contains the GAP to C compiler.
@@ -50,14 +50,13 @@
 #include        "exprs.h"               /* expressions                     */
 #include        "stats.h"               /* statements                      */
 
-#include        "compiler.h"            /* compiler                        */
+#include        "JSON_compiler.h"            /* compiler                        */
 
 #include        "hpc/tls.h"             /* thread-local storage            */
 
 #include        "vars.h"                /* variables                       */
 
 FILE* json;
-
 
 /****************************************************************************
 **
@@ -70,66 +69,66 @@ FILE* json;
 **
 
 
-*V  CompFastIntArith  . . option to emit code that handles small ints. faster
+*V  JSON_CompFastIntArith  . . option to emit code that handles small ints. faster
 */
-Int CompFastIntArith;
+Int JSON_CompFastIntArith;
 
 
 /****************************************************************************
 **
-*V  CompFastPlainLists  . option to emit code that handles plain lists faster
+*V  JSON_CompFastPlainLists  . option to emit code that handles plain lists faster
 */
-Int CompFastPlainLists ;
+Int JSON_CompFastPlainLists ;
 
 
 /****************************************************************************
 **
-*V  CompFastListFuncs . . option to emit code that inlines calls to functions
+*V  JSON_CompFastListFuncs . . option to emit code that inlines calls to functions
 */
-Int CompFastListFuncs;
+Int JSON_CompFastListFuncs;
 
 
 /****************************************************************************
 **
-*V  CompCheckTypes  . . . . option to emit code that assumes all types are ok.
+*V  JSON_CompCheckTypes  . . . . option to emit code that assumes all types are ok.
 */
-Int CompCheckTypes ;
+Int JSON_CompCheckTypes ;
 
 
 /****************************************************************************
 **
-*V  CompCheckListElements .  option to emit code that assumes list elms exist
+*V  JSON_CompCheckListElements .  option to emit code that assumes list elms exist
 */
-Int CompCheckListElements;
+Int JSON_CompCheckListElements;
 
 /****************************************************************************
 **
-*V  CompOptNames . .  names for all the compiler options passed by gac
+*V  JSON_CompOptNames . .  names for all the compiler options passed by gac
 **
 */
 
-struct CompOptStruc { const Char *extname;
+struct JSON_CompOptStruc { const Char *extname;
   Int *variable;
   Int val;};
 
-struct CompOptStruc CompOptNames[] = {
-  { "FAST_INT_ARITH", &CompFastIntArith, 1 },
-  { "FAST_PLAIN_LISTS", &CompFastPlainLists, 1 },
-  { "FAST_LIST_FUNCS", &CompFastListFuncs, 1 },
-  { "NO_CHECK_TYPES", &CompCheckTypes, 0 },
-  { "NO_CHECK_LIST_ELMS", &CompCheckListElements, 0 }};
+struct JSON_CompOptStruc JSON_CompOptNames[] = {
+  { "FAST_INT_ARITH", &JSON_CompFastIntArith, 1 },
+  { "FAST_PLAIN_LISTS", &JSON_CompFastPlainLists, 1 },
+  { "FAST_LIST_FUNCS", &JSON_CompFastListFuncs, 1 },
+  { "NO_CHECK_TYPES", &JSON_CompCheckTypes, 0 },
+  { "NO_CHECK_LIST_ELMS", &JSON_CompCheckListElements, 0 }};
 
-#define N_CompOpts  (sizeof(CompOptNames)/sizeof(struct CompOptStruc))
+#define N_JSON_CompOpts  (sizeof(JSON_CompOptNames)/sizeof(struct JSON_CompOptStruc))
 
 
 /****************************************************************************
 **
-*F  SetCompileOpts( <string> ) . . parse the compiler options from <string>
+*F  SetJSON_CompileOpts( <string> ) . . parse the compiler options from <string>
 **                                 and set the appropriate variables
 **                                 unrecognised options are ignored for now
 */
 
-void SetCompileOpts( Char *opts )
+void SetJSON_CompileOpts( Char *opts )
 {
   Char *s = opts;
   Int i;
@@ -137,13 +136,13 @@ void SetCompileOpts( Char *opts )
     {
       while (IsSpace(*s))
         s++;
-      for (i = 0; i < N_CompOpts; i++)
+      for (i = 0; i < N_JSON_CompOpts; i++)
         {
-          if (0 == strncmp(CompOptNames[i].extname,
+          if (0 == strncmp(JSON_CompOptNames[i].extname,
                              s,
-                             strlen(CompOptNames[i].extname)))
+                             strlen(JSON_CompOptNames[i].extname)))
             {
-              *(CompOptNames[i].variable) = CompOptNames[i].val;
+              *(JSON_CompOptNames[i].variable) = JSON_CompOptNames[i].val;
               break;
             }
         }
@@ -157,16 +156,16 @@ void SetCompileOpts( Char *opts )
 
 /****************************************************************************
 **
-*V  CompCheckPosObjElements .  option to emit code that assumes pos elm exist
+*V  JSON_CompCheckPosObjElements .  option to emit code that assumes pos elm exist
 */
-Int CompCheckPosObjElements;
+Int JSON_CompCheckPosObjElements;
 
 
 /****************************************************************************
 **
-*V  CompPass  . . . . . . . . . . . . . . . . . . . . . . . . . compiler pass
+*V  JSON_CompPass  . . . . . . . . . . . . . . . . . . . . . . . . . compiler pass
 **
-**  'CompPass' holds the number of the current pass.
+**  'JSON_CompPass' holds the number of the current pass.
 **
 **  The compiler does two passes over the source.
 **
@@ -186,11 +185,11 @@ Int CompCheckPosObjElements;
 **  In the second pass it emits code.
 **
 **  The only difference between the  first pass and  the second pass is  that
-**  'Emit'  emits  no code  during the first  pass.   While  this causes many
+**  'JSON_Emit'  emits  no code  during the first  pass.   While  this causes many
 **  unneccessary  computations during the first pass,  the  advantage is that
 **  the two passes are guaranteed to do exactly the same computations.
 */
-Int CompPass;
+Int JSON_CompPass;
 
 
 /****************************************************************************
@@ -234,14 +233,14 @@ typedef UInt           CVar;
 
 /****************************************************************************
 **
-*F  SetInfoCVar( <cvar>, <type> ) . . . . . . .  set the type of a C variable
-*F  GetInfoCVar( <cvar> ) . . . . . . . . . . .  get the type of a C variable
-*F  HasInfoCVar( <cvar>, <type> ) . . . . . . . test the type of a C variable
+*F  JSON_SetInfoCVar( <cvar>, <type> ) . . . . . . .  set the type of a C variable
+*F  JSON_GetInfoCVar( <cvar> ) . . . . . . . . . . .  get the type of a C variable
+*F  JSON_HasInfoCVar( <cvar>, <type> ) . . . . . . . test the type of a C variable
 **
-*F  NewInfoCVars()  . . . . . . . . . allocate a new info bag for C variables
-*F  CopyInfoCVars( <dst>, <src> ) . .  copy between info bags for C variables
-*F  MergeInfoCVars( <dst>, <src> )  . . . merge two info bags for C variables
-*F  IsEqInfoCVars( <dst>, <src> ) . . . compare two info bags for C variables
+*F  JSON_NewInfoCVars()  . . . . . . . . . allocate a new info bag for C variables
+*F  JSON_CopyInfoCVars( <dst>, <src> ) . .  copy between info bags for C variables
+*F  JSON_MergeInfoCVars( <dst>, <src> )  . . . merge two info bags for C variables
+*F  JSON_IsEqInfoCVars( <dst>, <src> ) . . . compare two info bags for C variables
 **
 **  With each function we  associate a C  variables information bag.  In this
 **  bag we store  the number of the  function, the number of local variables,
@@ -253,18 +252,18 @@ typedef UInt           CVar;
 **  about this local variable or temporary, i.e., whether the variable has an
 **  assigned value, whether that value is an integer, a boolean, etc.
 **
-**  'SetInfoCVar' sets the    information   for  the  C variable      <cvar>.
-**  'GetInfoCVar' gets   the   information  for   the  C    variable  <cvar>.
-**  'HasInfoCVar' returns true if the C variable <cvar> has the type <type>.
+**  'JSON_SetInfoCVar' sets the    information   for  the  C variable      <cvar>.
+**  'JSON_GetInfoCVar' gets   the   information  for   the  C    variable  <cvar>.
+**  'JSON_HasInfoCVar' returns true if the C variable <cvar> has the type <type>.
 **
-**  'NewInfoCVars'  creates    a    new    C  variables     information  bag.
-**  'CopyInfoCVars' copies the C  variables information from <src> to  <dst>.
-**  'MergeInfoCVars' merges the C variables information  from <src> to <dst>,
+**  'JSON_NewInfoCVars'  creates    a    new    C  variables     information  bag.
+**  'JSON_CopyInfoCVars' copies the C  variables information from <src> to  <dst>.
+**  'JSON_MergeInfoCVars' merges the C variables information  from <src> to <dst>,
 **  i.e., if there are two paths to a  certain place in  the source and <dst>
 **  is the information gathered  along one path  and <src> is the information
-**  gathered along the other path, then  'MergeInfoCVars' stores in <dst> the
+**  gathered along the other path, then  'JSON_MergeInfoCVars' stores in <dst> the
 **  information for   that   point  (independent   of  the  path  travelled).
-**  'IsEqInfoCVars' returns   true  if <src>    and <dst> contain   the  same
+**  'JSON_IsEqInfoCVars' returns   true  if <src>    and <dst> contain   the  same
 **  information.
 **
 **  Note that  the numeric  values for the  types  are defined such  that  if
@@ -301,7 +300,7 @@ typedef UInt4           LVar;
 
 #define W_INT_SMALL_POS         (W_INT_SMALL | W_INT_POS)
 
-void            SetInfoCVar (
+void            JSON_SetInfoCVar (
     CVar                cvar,
     UInt                type )
 {
@@ -322,7 +321,7 @@ void            SetInfoCVar (
     }
 }
 
-Int             GetInfoCVar (
+Int             JSON_GetInfoCVar (
     CVar                cvar )
 {
     Bag                 info;           /* its info bag                    */
@@ -351,15 +350,15 @@ Int             GetInfoCVar (
     }
 }
 
-Int             HasInfoCVar (
+Int             JSON_HasInfoCVar (
     CVar                cvar,
     Int                 type )
 {
-    return ((GetInfoCVar( cvar ) & type) == type);
+    return ((JSON_GetInfoCVar( cvar ) & type) == type);
 }
 
 
-Bag             NewInfoCVars ( void )
+Bag             JSON_NewInfoCVars ( void )
 {
     Bag                 old;
     Bag                 new;
@@ -368,7 +367,7 @@ Bag             NewInfoCVars ( void )
     return new;
 }
 
-void            CopyInfoCVars (
+void            JSON_CopyInfoCVars (
     Bag                 dst,
     Bag                 src )
 {
@@ -389,7 +388,7 @@ void            CopyInfoCVars (
     }
 }
 
-void            MergeInfoCVars (
+void            JSON_MergeInfoCVars (
     Bag                 dst,
     Bag                 src )
 {
@@ -405,7 +404,7 @@ void            MergeInfoCVars (
     }
 }
 
-Int             IsEqInfoCVars (
+Int             JSON_IsEqInfoCVars (
     Bag                 dst,
     Bag                 src )
 {
@@ -428,13 +427,13 @@ Int             IsEqInfoCVars (
 
 /****************************************************************************
 **
-*F  NewTemp( <name> ) . . . . . . . . . . . . . . .  allocate a new temporary
-*F  FreeTemp( <temp> )  . . . . . . . . . . . . . . . . . .  free a temporary
+*F  JSON_NewTemp( <name> ) . . . . . . . . . . . . . . .  allocate a new temporary
+*F  JSON_FreeTemp( <temp> )  . . . . . . . . . . . . . . . . . .  free a temporary
 **
-**  'NewTemp' allocates  a  new  temporary   variable (<name>  is   currently
+**  'JSON_NewTemp' allocates  a  new  temporary   variable (<name>  is   currently
 **  ignored).
 **
-**  'FreeTemp' frees the temporary <temp>.
+**  'JSON_FreeTemp' frees the temporary <temp>.
 **
 **  Currently  allocations and deallocations   of  temporaries are done  in a
 **  strict nested (laff -- last allocated, first freed) order.  This means we
@@ -442,7 +441,7 @@ Int             IsEqInfoCVars (
 */
 typedef UInt4           Temp;
 
-Temp            NewTemp (
+Temp            JSON_NewTemp (
     const Char *        name )
 {
     Temp                temp;           /* new temporary, result           */
@@ -468,7 +467,7 @@ Temp            NewTemp (
     return temp;
 }
 
-void            FreeTemp (
+void            JSON_FreeTemp (
     Temp                temp )
 {
     Bag                 info;           /* information bag                 */
@@ -477,7 +476,7 @@ void            FreeTemp (
     info = INFO_FEXP( CURR_FUNC );
 
     /* check that deallocations happens in the correct order               */
-    if ( temp != CTEMP_INFO( info ) && CompPass == 2 ) {
+    if ( temp != CTEMP_INFO( info ) && JSON_CompPass == 2 ) {
         //Pr("PROBLEM: freeing t_%d, should be t_%d\n",(Int)temp,CTEMP_INFO(info));
     }
 
@@ -489,40 +488,40 @@ void            FreeTemp (
 
 /****************************************************************************
 **
-*F  CompSetUseHVar( <hvar> )  . . . . . . . . register use of higher variable
-*F  CompGetUseHVar( <hvar> )  . . . . . . . . get use mode of higher variable
-*F  GetLevlHVar( <hvar> ) . . . . . . . . . . .  get level of higher variable
-*F  GetIndxHVar( <hvar> ) . . . . . . . . . . .  get index of higher variable
+*F  JSON_CompSetUseHVar( <hvar> )  . . . . . . . . register use of higher variable
+*F  JSON_CompGetUseHVar( <hvar> )  . . . . . . . . get use mode of higher variable
+*F  JSON_GetLevlHVar( <hvar> ) . . . . . . . . . . .  get level of higher variable
+*F  JSON_GetIndxHVar( <hvar> ) . . . . . . . . . . .  get index of higher variable
 **
-**  'CompSetUseHVar'  register (during pass 1)   that the variable <hvar>  is
+**  'JSON_CompSetUseHVar'  register (during pass 1)   that the variable <hvar>  is
 **  used  as   higher  variable, i.e.,  is  referenced   from inside  a local
 **  function.  Such variables  must be allocated  in  a stack frame  bag (and
 **  cannot be mapped to C variables).
 **
-**  'CompGetUseHVar' returns nonzero if the variable <hvar> is used as higher
+**  'JSON_CompGetUseHVar' returns nonzero if the variable <hvar> is used as higher
 **  variable.
 **
-**  'GetLevlHVar' returns the level of the  higher variable <hvar>, i.e., the
+**  'JSON_GetLevlHVar' returns the level of the  higher variable <hvar>, i.e., the
 **  number of  frames  that must be  walked upwards   for the  one containing
 **  <hvar>.  This may be properly  smaller than 'LEVEL_HVAR(<hvar>)', because
 **  only those compiled functions that have local variables  that are used as
 **  higher variables allocate a stack frame.
 **
-**  'GetIndxHVar' returns the index of the higher  variable <hvar>, i.e., the
+**  'JSON_GetIndxHVar' returns the index of the higher  variable <hvar>, i.e., the
 **  position of <hvar> in the stack frame.  This may be properly smaller than
 **  'INDEX_HVAR(<hvar>)', because only those  local variable that are used as
 **  higher variables are allocated in a stack frame.
 */
 typedef UInt4           HVar;
 
-void            CompSetUseHVar (
+void            JSON_CompSetUseHVar (
     HVar                hvar )
 {
     Bag                 info;           /* its info bag                    */
     Int                 i;              /* loop variable                   */
 
     /* only mark in pass 1                                                 */
-    if ( CompPass != 1 )  return;
+    if ( JSON_CompPass != 1 )  return;
 
     /* walk up                                                             */
     info = INFO_FEXP( CURR_FUNC );
@@ -538,7 +537,7 @@ void            CompSetUseHVar (
 
 }
 
-Int             CompGetUseHVar (
+Int             JSON_CompGetUseHVar (
     HVar                hvar )
 {
     Bag                 info;           /* its info bag                    */
@@ -554,7 +553,7 @@ Int             CompGetUseHVar (
     return (TNUM_LVAR_INFO( info, (hvar & 0xFFFF) ) == W_HIGHER);
 }
 
-UInt            GetLevlHVar (
+UInt            JSON_GetLevlHVar (
     HVar                hvar )
 {
     UInt                levl;           /* level of higher variable        */
@@ -580,7 +579,7 @@ UInt            GetLevlHVar (
     return levl - 1;
 }
 
-UInt            GetIndxHVar (
+UInt            JSON_GetIndxHVar (
     HVar                hvar )
 {
     UInt                indx;           /* index of higher variable        */
@@ -606,13 +605,13 @@ UInt            GetIndxHVar (
 
 /****************************************************************************
 **
-*F  CompSetUseGVar( <gvar>, <mode> )  . . . . register use of global variable
-*F  CompGetUseGVar( <gvar> )  . . . . . . . . get use mode of global variable
+*F  JSON_CompSetUseGVar( <gvar>, <mode> )  . . . . register use of global variable
+*F  JSON_CompGetUseGVar( <gvar> )  . . . . . . . . get use mode of global variable
 **
-**  'CompSetUseGVar' registers (during pass 1) the use of the global variable
+**  'JSON_CompSetUseGVar' registers (during pass 1) the use of the global variable
 **  with identifier <gvar>.
 **
-**  'CompGetUseGVar'  returns the bitwise OR  of all the <mode> arguments for
+**  'JSON_CompGetUseGVar'  returns the bitwise OR  of all the <mode> arguments for
 **  the global variable with identifier <gvar>.
 **
 **  Currently the interpretation of the <mode> argument is as follows
@@ -636,41 +635,41 @@ typedef UInt    GVar;
 #define COMP_USE_GVAR_COPY      (1L << 1)
 #define COMP_USE_GVAR_FOPY      (1L << 2)
 
-Bag             CompInfoGVar;
+Bag             JSON_CompInfoGVar;
 
-void            CompSetUseGVar (
+void            JSON_CompSetUseGVar (
     GVar                gvar,
     UInt                mode )
 {
     /* only mark in pass 1                                                 */
-    if ( CompPass != 1 )  return;
+    if ( JSON_CompPass != 1 )  return;
 
     /* resize if neccessary                                                */
-    if ( SIZE_OBJ(CompInfoGVar)/sizeof(UInt) <= gvar ) {
-        ResizeBag( CompInfoGVar, sizeof(UInt)*(gvar+1) );
+    if ( SIZE_OBJ(JSON_CompInfoGVar)/sizeof(UInt) <= gvar ) {
+        ResizeBag( JSON_CompInfoGVar, sizeof(UInt)*(gvar+1) );
     }
 
     /* or with <mode>                                                      */
-    ((UInt*)PTR_BAG(CompInfoGVar))[gvar] |= mode;
+    ((UInt*)PTR_BAG(JSON_CompInfoGVar))[gvar] |= mode;
 }
 
-UInt            CompGetUseGVar (
+UInt            JSON_CompGetUseGVar (
     GVar                gvar )
 {
-    return ((UInt*)PTR_BAG(CompInfoGVar))[gvar];
+    return ((UInt*)PTR_BAG(JSON_CompInfoGVar))[gvar];
 }
 
-void            Emit (
+void            JSON_Emit (
     const char *        fmt,
     ... );
 
 /****************************************************************************
 **
-*F  CompSetUseRNam( <rnam>, <mode> )  . . . . . . register use of record name
-*F  CompGetUseRNam( <rnam> )  . . . . . . . . . . get use mode of record name
+*F  JSON_CompSetUseRNam( <rnam>, <mode> )  . . . . . . register use of record name
+*F  JSON_CompGetUseRNam( <rnam> )  . . . . . . . . . . get use mode of record name
 **
-**  'CompSetUseRNam' registers  (during pass  1) the use   of the record name
-**  with identifier <rnam>.  'CompGetUseRNam'  returns the bitwise OR  of all
+**  'JSON_CompSetUseRNam' registers  (during pass  1) the use   of the record name
+**  with identifier <rnam>.  'JSON_CompGetUseRNam'  returns the bitwise OR  of all
 **  the <mode> arguments for the global variable with identifier <rnam>.
 **
 **  Currently the interpretation of the <mode> argument is as follows
@@ -684,43 +683,43 @@ typedef UInt    RNam;
 
 #define COMP_USE_RNAM_ID        (1L << 0)
 
-Bag             CompInfoRNam;
+Bag             JSON_CompInfoRNam;
 
-void            CompSetUseRNam (
+void            JSON_CompSetUseRNam (
     RNam                rnam,
     UInt                mode )
 {
-//    Emit( "\"(CompSetUseRNam) RNAME_SET: %s\"", NAME_RNAM(rnam) );
+//    JSON_Emit( "\"(JSON_CompSetUseRNam) RNAME_SET: %s\"", NAME_RNAM(rnam) );
 
     /* only mark in pass 1                                                 */
-    if ( CompPass != 1 )  return;
+    if ( JSON_CompPass != 1 )  return;
 
     /* resize if neccessary                                                */
-    if ( SIZE_OBJ(CompInfoRNam)/sizeof(UInt) <= rnam ) {
-        ResizeBag( CompInfoRNam, sizeof(UInt)*(rnam+1) );
+    if ( SIZE_OBJ(JSON_CompInfoRNam)/sizeof(UInt) <= rnam ) {
+        ResizeBag( JSON_CompInfoRNam, sizeof(UInt)*(rnam+1) );
     }
 
     /* or with <mode>                                                      */
-    ((UInt*)PTR_BAG(CompInfoRNam))[rnam] |= mode;
+    ((UInt*)PTR_BAG(JSON_CompInfoRNam))[rnam] |= mode;
 
 }
 
-UInt            CompGetUseRNam (
+UInt            JSON_CompGetUseRNam (
     RNam                rnam )
 {
-    return ((UInt*)PTR_BAG(CompInfoRNam))[rnam];
+    return ((UInt*)PTR_BAG(JSON_CompInfoRNam))[rnam];
 }
 
 
 /****************************************************************************
 **
-*F  Emit( <fmt>, ... )  . . . . . . . . . . . . . . . . . . . . . . emit code
+*F  JSON_Emit( <fmt>, ... )  . . . . . . . . . . . . . . . . . . . . . . emit code
 **
-**  'Emit' outputs the   string  <fmt> and the  other  arguments,  which must
+**  'JSON_Emit' outputs the   string  <fmt> and the  other  arguments,  which must
 **  correspond  to the '%'  format elements  in  <fmt>.  Nothing  is actually
-**  outputted if 'CompPass' is not 2.
+**  outputted if 'JSON_CompPass' is not 2.
 **
-**  'Emit'   supports the following   '%'  format elements:  '%d' formats  an
+**  'JSON_Emit'   supports the following   '%'  format elements:  '%d' formats  an
 **  integer,   '%s' formats a  string,  '%S' formats a    string with all the
 **  necessary escapes, %C does the same  but uses only  valid C escapes, '%n'
 **  formats a  name   ('_' is  converted   to '__',  special  characters  are
@@ -819,7 +818,7 @@ char* escapeWhitespace(char* str) {
     return newStr;
 }
 
-void            Emit (
+void            JSON_Emit (
     const char *        fmt,
     ... )
 {
@@ -831,7 +830,7 @@ void            Emit (
     const Char *        hex = "0123456789ABCDEF";
 
     /* are we in pass 2?                                                   */
-    if ( CompPass != 2 )  return;
+    if ( JSON_CompPass != 2 )  return;
 
     /* get the information bag                                             */
     narg = NARG_FUNC( CURR_FUNC );
@@ -861,7 +860,7 @@ void            Emit (
                 str = escapeWhitespace(preprocessedStr);
                 fprintf(json, "%s", str);
             } else {
-                fprintf(stderr, "ERROR: Unexpected string in compiler.c, Emit\n");
+                fprintf(stderr, "ERROR: Unexpected string in compiler.c, JSON_Emit\n");
             }
         } else { //just print character
             fputc(*p, json);
@@ -884,9 +883,9 @@ void            Emit (
 **
 
 
-*F  CompCheckBound( <obj>, <name> ) emit code to check that <obj> has a value
+*F  JSON_CompCheckBound( <obj>, <name> ) emit code to check that <obj> has a value
 */
-void CompCheckBound (
+void JSON_CompCheckBound (
     CVar                obj,
     Char *              name )
 {
@@ -896,9 +895,9 @@ void CompCheckBound (
 
 /****************************************************************************
 **
-*F  CompCheckFuncResult( <obj> )  . emit code to check that <obj> has a value
+*F  JSON_CompCheckFuncResult( <obj> )  . emit code to check that <obj> has a value
 */
-void CompCheckFuncResult (
+void JSON_CompCheckFuncResult (
     CVar                obj )
 {
 }
@@ -906,39 +905,9 @@ void CompCheckFuncResult (
 
 /****************************************************************************
 **
-*F  CompCheckIntSmall( <obj> )   emit code to check that <obj> is a small int
+*F  JSON_CompCheckIntSmall( <obj> )   emit code to check that <obj> is a small int
 */
-void CompCheckIntSmall (
-    CVar                obj )
-{
-}
-
-
-
-/****************************************************************************
-**
-*F  CompCheckIntSmallPos( <obj> ) emit code to check that <obj> is a position
-*/
-void CompCheckIntSmallPos (
-    CVar                obj )
-{
-}
-
-/****************************************************************************
-**
-*F  CompCheckIntPos( <obj> ) emit code to check that <obj> is a position
-*/
-void CompCheckIntPos (
-    CVar                obj )
-{
-}
-
-
-/****************************************************************************
-**
-*F  CompCheckBool( <obj> )  . . .  emit code to check that <obj> is a boolean
-*/
-void CompCheckBool (
+void JSON_CompCheckIntSmall (
     CVar                obj )
 {
 }
@@ -947,9 +916,39 @@ void CompCheckBool (
 
 /****************************************************************************
 **
-*F  CompCheckFunc( <obj> )  . . . emit code to check that <obj> is a function
+*F  JSON_CompCheckIntSmallPos( <obj> ) emit code to check that <obj> is a position
 */
-void CompCheckFunc (
+void JSON_CompCheckIntSmallPos (
+    CVar                obj )
+{
+}
+
+/****************************************************************************
+**
+*F  JSON_CompCheckIntPos( <obj> ) emit code to check that <obj> is a position
+*/
+void JSON_CompCheckIntPos (
+    CVar                obj )
+{
+}
+
+
+/****************************************************************************
+**
+*F  JSON_CompCheckBool( <obj> )  . . .  emit code to check that <obj> is a boolean
+*/
+void JSON_CompCheckBool (
+    CVar                obj )
+{
+}
+
+
+
+/****************************************************************************
+**
+*F  JSON_CompCheckFunc( <obj> )  . . . emit code to check that <obj> is a function
+*/
+void JSON_CompCheckFunc (
     CVar                obj )
 {
 }
@@ -965,30 +964,30 @@ void CompCheckFunc (
 /****************************************************************************
 **
 
-*F  CompExpr( <expr> )  . . . . . . . . . . . . . . . . compile an expression
+*F  JSON_CompExpr( <expr> )  . . . . . . . . . . . . . . . . compile an expression
 **
-**  'CompExpr' compiles the expression <expr> and returns the C variable that
+**  'JSON_CompExpr' compiles the expression <expr> and returns the C variable that
 **  will contain the result.
 */
-CVar (* CompExprFuncs[256]) ( Expr expr );
+CVar (* JSON_CompExprFuncs[256]) ( Expr expr );
 
 
-CVar CompExpr (
+CVar JSON_CompExpr (
     Expr                expr )
 {
-    return (* CompExprFuncs[ TNUM_EXPR(expr) ])( expr );
+    return (* JSON_CompExprFuncs[ TNUM_EXPR(expr) ])( expr );
 }
 
 
 /****************************************************************************
 **
-*F  CompUnknownExpr( <expr> ) . . . . . . . . . . . .  log unknown expression
+*F  JSON_CompUnknownExpr( <expr> ) . . . . . . . . . . . .  log unknown expression
 */
-CVar CompUnknownExpr (
+CVar JSON_CompUnknownExpr (
     Expr                expr )
 {
-    //Emit( "CANNOT COMPILE EXPRESSION OF TNUM %d;\n", TNUM_EXPR(expr) );
-    Emit("\"Unknown expression\"");
+    //JSON_Emit( "CANNOT COMPILE EXPRESSION OF TNUM %d;\n", TNUM_EXPR(expr) );
+    JSON_Emit("\"Unknown expression\"");
     return 0;
 }
 
@@ -996,39 +995,39 @@ CVar CompUnknownExpr (
 
 /****************************************************************************
 **
-*F  CompBoolExpr( <expr> )  . . . . . . . compile bool expr and return C bool
+*F  JSON_CompBoolExpr( <expr> )  . . . . . . . compile bool expr and return C bool
 */
-CVar (* CompBoolExprFuncs[256]) ( Expr expr );
+CVar (* JSON_CompBoolExprFuncs[256]) ( Expr expr );
 
-CVar CompBoolExpr (
+CVar JSON_CompBoolExpr (
     Expr                expr )
 {
-    return (* CompBoolExprFuncs[ TNUM_EXPR(expr) ])( expr );
+    return (* JSON_CompBoolExprFuncs[ TNUM_EXPR(expr) ])( expr );
 }
 
 
 /****************************************************************************
 **
-*F  CompUnknownBool( <expr> ) . . . . . . . . . .  use 'CompExpr' and convert
+*F  JSON_CompUnknownBool( <expr> ) . . . . . . . . . .  use 'JSON_CompExpr' and convert
 */
-CVar CompUnknownBool (
+CVar JSON_CompUnknownBool (
     Expr                expr )
 {
     CVar                res;            /* result                          */
     CVar                val;            /* value of expression             */
 
     /* allocate a new temporary for the result                             */
-    res = CVAR_TEMP( NewTemp( "res" ) );
+    res = CVAR_TEMP( JSON_NewTemp( "res" ) );
 
     /* compile the expression and check that the value is boolean          */
-    val = CompExpr( expr );
-    CompCheckBool( val );
+    val = JSON_CompExpr( expr );
+    JSON_CompCheckBool( val );
     
     /* we know that the result is boolean (should be 'W_CBOOL')            */
-    SetInfoCVar( res, W_BOOL );
+    JSON_SetInfoCVar( res, W_BOOL );
 
     /* free the temporary                                                  */
-    if ( IS_TEMP_CVAR( val ) )  FreeTemp( TEMP_CVAR( val ) );
+    if ( IS_TEMP_CVAR( val ) )  JSON_FreeTemp( TEMP_CVAR( val ) );
 
     /* return the result                                                   */
     return res;
@@ -1044,13 +1043,13 @@ GVar G_Length;
 
 /****************************************************************************
 **
-*F  CompFunccall0to6Args( <expr> )  . . . T_FUNCCALL_0ARGS...T_FUNCCALL_6ARGS
+*F  JSON_CompFunccall0to6Args( <expr> )  . . . T_FUNCCALL_0ARGS...T_FUNCCALL_6ARGS
 */
-extern CVar CompRefGVarFopy (
+extern CVar JSON_CompRefGVarFopy (
             Expr                expr );
 
 
-CVar CompFunccall0to6Args (
+CVar JSON_CompFunccall0to6Args (
     Expr                expr )
 {
     CVar                result;         /* result, result                  */
@@ -1059,43 +1058,43 @@ CVar CompFunccall0to6Args (
     Int                 narg;           /* number of arguments             */
     Int                 i;              /* loop variable                   */
 
-    Emit("{ \"type\":\"functionCall\", \"name\":"); 
+    JSON_Emit("{ \"type\":\"functionCall\", \"name\":"); 
 
     /* allocate a temporary for the result                                 */
-    result = CVAR_TEMP( NewTemp( "result" ) );
+    result = CVAR_TEMP( JSON_NewTemp( "result" ) );
 
     /* compile the reference to the function                               */
     if ( TNUM_EXPR( FUNC_CALL(expr) ) == T_REF_GVAR ) {
-        func = CompRefGVarFopy( FUNC_CALL(expr) );
+        func = JSON_CompRefGVarFopy( FUNC_CALL(expr) );
     }
     else {
-        func = CompExpr( FUNC_CALL(expr) );
+        func = JSON_CompExpr( FUNC_CALL(expr) );
     }
 
-    Emit(", \"args\":[");
+    JSON_Emit(", \"args\":[");
 
     /* compile the argument expressions                                    */
     narg = NARG_SIZE_CALL(SIZE_EXPR(expr));
     for ( i = 1; i <= narg; i++ ) {
-        args[i] = CompExpr( ARGI_CALL(expr,i) );
+        args[i] = JSON_CompExpr( ARGI_CALL(expr,i) );
         if( i < narg) {
-          Emit(", ");
+          JSON_Emit(", ");
         }
     }
 
     /* emit the code for the procedure call                                */
-    //Emit( "%c = CALL_%dARGS( %c", result, narg, func );
+    //JSON_Emit( "%c = CALL_%dARGS( %c", result, narg, func );
     for ( i = 1; i <= narg; i++ ) {
-        //Emit( ", %c", args[i] );
+        //JSON_Emit( ", %c", args[i] );
     }
 
     /* free the temporaries                                                */
     for ( i = narg; 1 <= i; i-- ) {
-        if ( IS_TEMP_CVAR( args[i] ) )  FreeTemp( TEMP_CVAR( args[i] ) );
+        if ( IS_TEMP_CVAR( args[i] ) )  JSON_FreeTemp( TEMP_CVAR( args[i] ) );
     }
-    if ( IS_TEMP_CVAR( func ) )  FreeTemp( TEMP_CVAR( func ) );
+    if ( IS_TEMP_CVAR( func ) )  JSON_FreeTemp( TEMP_CVAR( func ) );
 
-    Emit("] }");
+    JSON_Emit("] }");
 
     /* return the result                                                   */
     return result;
@@ -1104,9 +1103,9 @@ CVar CompFunccall0to6Args (
 
 /****************************************************************************
 **
-*F  CompFunccallXArgs( <expr> ) . . . . . . . . . . . . . .  T_FUNCCALL_XARGS
+*F  JSON_CompFunccallXArgs( <expr> ) . . . . . . . . . . . . . .  T_FUNCCALL_XARGS
 */
-CVar CompFunccallXArgs (
+CVar JSON_CompFunccallXArgs (
     Expr                expr )
 {
     CVar                result;         /* result, result                  */
@@ -1116,44 +1115,44 @@ CVar CompFunccallXArgs (
     UInt                narg;           /* number of arguments             */
     UInt                i;              /* loop variable                   */
 
-    Emit("{\"type\":\"FunccallXArgs\", \"function\":");
+    JSON_Emit("{\"type\":\"FunccallXArgs\", \"function\":");
     /* allocate a temporary for the result                                 */
-    result = CVAR_TEMP( NewTemp( "result" ) );
+    result = CVAR_TEMP( JSON_NewTemp( "result" ) );
 
     /* compile the reference to the function                               */
     if ( TNUM_EXPR( FUNC_CALL(expr) ) == T_REF_GVAR ) {
-        func = CompRefGVarFopy( FUNC_CALL(expr) );
+        func = JSON_CompRefGVarFopy( FUNC_CALL(expr) );
     }
     else {
-        func = CompExpr( FUNC_CALL(expr) );
-        CompCheckFunc( func );
+        func = JSON_CompExpr( FUNC_CALL(expr) );
+        JSON_CompCheckFunc( func );
     }
 
     /* compile the argument expressions                                    */
     narg = NARG_SIZE_CALL(SIZE_EXPR(expr));
-    argl = CVAR_TEMP( NewTemp( "argl" ) );
-    //Emit( "%c = NEW_PLIST( T_PLIST, %d );\n", argl, narg );
-    //Emit( "SET_LEN_PLIST( %c, %d );\n", argl, narg );
+    argl = CVAR_TEMP( JSON_NewTemp( "argl" ) );
+    //JSON_Emit( "%c = NEW_PLIST( T_PLIST, %d );\n", argl, narg );
+    //JSON_Emit( "SET_LEN_PLIST( %c, %d );\n", argl, narg );
   
-    Emit(", \"args\":[");
+    JSON_Emit(", \"args\":[");
 
     for ( i = 1; i <= narg; i++ ) {
-        argi = CompExpr( ARGI_CALL( expr, i ) );
-        if(i < narg) { Emit(", ");}
-        if ( IS_TEMP_CVAR( argi ) )  FreeTemp( TEMP_CVAR( argi ) );
+        argi = JSON_CompExpr( ARGI_CALL( expr, i ) );
+        if(i < narg) { JSON_Emit(", ");}
+        if ( IS_TEMP_CVAR( argi ) )  JSON_FreeTemp( TEMP_CVAR( argi ) );
     }
 
     /* emit the code for the procedure call                                */
-    //Emit( "%c = CALL_XARGS( %c, %c );\n", result, func, argl );
+    //JSON_Emit( "%c = CALL_XARGS( %c, %c );\n", result, func, argl );
 
     /* emit code for the check (sets the information for the result)       */
-    CompCheckFuncResult( result );
+    JSON_CompCheckFuncResult( result );
 
-    Emit("]}");
+    JSON_Emit("]}");
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( argl ) )  FreeTemp( TEMP_CVAR( argl ) );
-    if ( IS_TEMP_CVAR( func ) )  FreeTemp( TEMP_CVAR( func ) );
+    if ( IS_TEMP_CVAR( argl ) )  JSON_FreeTemp( TEMP_CVAR( argl ) );
+    if ( IS_TEMP_CVAR( func ) )  JSON_FreeTemp( TEMP_CVAR( func ) );
 
     /* return the result                                                   */
     return result;
@@ -1161,37 +1160,37 @@ CVar CompFunccallXArgs (
 
 /****************************************************************************
 **
-*F  CompFunccallOpts( <expr> ) . . . . . . . . . . . . . .  T_FUNCCALL_OPTS
+*F  JSON_CompFunccallOpts( <expr> ) . . . . . . . . . . . . . .  T_FUNCCALL_OPTS
 */
-CVar CompFunccallOpts(
+CVar JSON_CompFunccallOpts(
                       Expr expr)
 {
-  Emit("{ \"type\":\"FunccallOpts\", \"opts\":");
-  CVar opts = CompExpr(ADDR_STAT(expr)[0]);
-  Emit(", \"result\":");
+  JSON_Emit("{ \"type\":\"FunccallOpts\", \"opts\":");
+  CVar opts = JSON_CompExpr(ADDR_STAT(expr)[0]);
+  JSON_Emit(", \"result\":");
   GVar pushOptions;
   GVar popOptions;
   CVar result;
   pushOptions = GVarName("PushOptions");
   popOptions = GVarName("PopOptions");
-  CompSetUseGVar(pushOptions, COMP_USE_GVAR_FOPY);
-  CompSetUseGVar(popOptions, COMP_USE_GVAR_FOPY);
-  //Emit("CALL_1ARGS( GF_PushOptions, %c );\n", opts);
-  if (IS_TEMP_CVAR( opts) ) FreeTemp( TEMP_CVAR( opts ));
-  result = CompExpr(ADDR_STAT(expr)[1]);
-  Emit("}");
-  //Emit("CALL_0ARGS( GF_PopOptions );\n");
+  JSON_CompSetUseGVar(pushOptions, COMP_USE_GVAR_FOPY);
+  JSON_CompSetUseGVar(popOptions, COMP_USE_GVAR_FOPY);
+  //JSON_Emit("CALL_1ARGS( GF_PushOptions, %c );\n", opts);
+  if (IS_TEMP_CVAR( opts) ) JSON_FreeTemp( TEMP_CVAR( opts ));
+  result = JSON_CompExpr(ADDR_STAT(expr)[1]);
+  JSON_Emit("}");
+  //JSON_Emit("CALL_0ARGS( GF_PopOptions );\n");
   return result;
 }
      
-void CompFunc (
+void JSON_CompFunc (
     Obj                 func );
 
 /****************************************************************************
 **
-*F  CompFuncExpr( <expr> )  . . . . . . . . . . . . . . . . . . . T_FUNC_EXPR
+*F  JSON_CompFuncExpr( <expr> )  . . . . . . . . . . . . . . . . . . . T_FUNC_EXPR
 */
-CVar CompFuncExpr (
+CVar JSON_CompFuncExpr (
     Expr                expr )
 {
     CVar                func;           /* function, result                */
@@ -1206,24 +1205,24 @@ CVar CompFuncExpr (
     fexp = ELM_PLIST( fexs, ((Int*)ADDR_EXPR(expr))[0] );
     nr   = NR_INFO( INFO_FEXP( fexp ) );
 
-    CompFunc( fexp );
+    JSON_CompFunc( fexp );
 
     /* allocate a new temporary for the function                           */
-    func = CVAR_TEMP( NewTemp( "func" ) );
+    func = CVAR_TEMP( JSON_NewTemp( "func" ) );
 
     /* make the function (all the pieces are in global variables)          */
-    //Emit( "%c = NewFunction( NameFunc[%d], NargFunc[%d], NamsFunc[%d]",
+    //JSON_Emit( "%c = NewFunction( NameFunc[%d], NargFunc[%d], NamsFunc[%d]",
     //      func, nr, nr, nr );
-    //Emit( ", HdlrFunc%d );\n", nr );
+    //JSON_Emit( ", HdlrFunc%d );\n", nr );
 
     /* this should probably be done by 'NewFunction'                       */
-    //Emit( "ENVI_FUNC( %c ) = TLS(CurrLVars);\n", func );
-    tmp = CVAR_TEMP( NewTemp( "body" ) );
+    //JSON_Emit( "ENVI_FUNC( %c ) = TLS(CurrLVars);\n", func );
+    tmp = CVAR_TEMP( JSON_NewTemp( "body" ) );
     
-    FreeTemp( TEMP_CVAR( tmp ) );
+    JSON_FreeTemp( TEMP_CVAR( tmp ) );
 
     /* we know that the result is a function                               */
-    SetInfoCVar( func, W_FUNC );
+    JSON_SetInfoCVar( func, W_FUNC );
 
     /* return the number of the C variable that will hold the function     */
     return func;
@@ -1232,9 +1231,9 @@ CVar CompFuncExpr (
 
 /****************************************************************************
 **
-*F  CompOr( <expr> )  . . . . . . . . . . . . . . . . . . . . . . . . .  T_OR
+*F  JSON_CompOr( <expr> )  . . . . . . . . . . . . . . . . . . . . . . . . .  T_OR
 */
-CVar CompOr (
+CVar JSON_CompOr (
     Expr                expr )
 {
     CVar                val;            /* or, result                      */
@@ -1243,33 +1242,33 @@ CVar CompOr (
     Bag                 only_left;      /* info after evaluating only left */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"or\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"or\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the left expression                                         */
-    left = CompBoolExpr( ADDR_EXPR(expr)[0] );
+    left = JSON_CompBoolExpr( ADDR_EXPR(expr)[0] );
     
-    only_left = NewInfoCVars();
-    CopyInfoCVars( only_left, INFO_FEXP(CURR_FUNC) );
+    only_left = JSON_NewInfoCVars();
+    JSON_CopyInfoCVars( only_left, INFO_FEXP(CURR_FUNC) );
 
-    Emit(", \"right\":");
+    JSON_Emit(", \"right\":");
 
     /* compile the right expression                                        */
-    right = CompBoolExpr( ADDR_EXPR(expr)[1] );
-    //Emit( "%c = (%c ? True : False);\n", val, right );
-    //Emit( "}\n" );
+    right = JSON_CompBoolExpr( ADDR_EXPR(expr)[1] );
+    //JSON_Emit( "%c = (%c ? True : False);\n", val, right );
+    //JSON_Emit( "}\n" );
 
     /* we know that the result is boolean                                  */
-    MergeInfoCVars( INFO_FEXP(CURR_FUNC), only_left );
-    SetInfoCVar( val, W_BOOL );
+    JSON_MergeInfoCVars( INFO_FEXP(CURR_FUNC), only_left );
+    JSON_SetInfoCVar( val, W_BOOL );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -1278,9 +1277,9 @@ CVar CompOr (
 
 /****************************************************************************
 **
-*F  CompOrBool( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_OR
+*F  JSON_CompOrBool( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_OR
 */
-CVar CompOrBool (
+CVar JSON_CompOrBool (
     Expr                expr )
 {
     CVar                val;            /* or, result                      */
@@ -1289,34 +1288,34 @@ CVar CompOrBool (
     Bag                 only_left;      /* info after evaluating only left */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
     
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"orBool\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"orBool\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the left expression                                         */
-    left = CompBoolExpr( ADDR_EXPR(expr)[0] );
-    //Emit( "%c = %c;\n", val, left );
-    //Emit( "if ( ! %c ) {\n", val );
-    only_left = NewInfoCVars();
-    CopyInfoCVars( only_left, INFO_FEXP(CURR_FUNC) );
+    left = JSON_CompBoolExpr( ADDR_EXPR(expr)[0] );
+    //JSON_Emit( "%c = %c;\n", val, left );
+    //JSON_Emit( "if ( ! %c ) {\n", val );
+    only_left = JSON_NewInfoCVars();
+    JSON_CopyInfoCVars( only_left, INFO_FEXP(CURR_FUNC) );
 
-    Emit(", \"right\":");
+    JSON_Emit(", \"right\":");
 
     /* compile the right expression                                        */
-    right = CompBoolExpr( ADDR_EXPR(expr)[1] );
-    //Emit( "%c = %c;\n", val, right );
-    //Emit( "}\n" );
+    right = JSON_CompBoolExpr( ADDR_EXPR(expr)[1] );
+    //JSON_Emit( "%c = %c;\n", val, right );
+    //JSON_Emit( "}\n" );
 
     /* we know that the result is boolean (should be 'W_CBOOL')            */
-    MergeInfoCVars( INFO_FEXP(CURR_FUNC), only_left );
-    SetInfoCVar( val, W_BOOL );
+    JSON_MergeInfoCVars( INFO_FEXP(CURR_FUNC), only_left );
+    JSON_SetInfoCVar( val, W_BOOL );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -1325,9 +1324,9 @@ CVar CompOrBool (
 
 /****************************************************************************
 **
-*F  CompAnd( <expr> ) . . . . . . . . . . . . . . . . . . . . . . . . . T_AND
+*F  JSON_CompAnd( <expr> ) . . . . . . . . . . . . . . . . . . . . . . . . . T_AND
 */
-CVar CompAnd (
+CVar JSON_CompAnd (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -1337,46 +1336,46 @@ CVar CompAnd (
     Bag                 only_left;      /* info after evaluating only left */
 
     /* allocate a temporary for the result                                 */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"and\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"and\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the left expression                                         */
-    left = CompExpr( ADDR_EXPR(expr)[0] );
-    only_left = NewInfoCVars();
-    CopyInfoCVars( only_left, INFO_FEXP(CURR_FUNC) );
+    left = JSON_CompExpr( ADDR_EXPR(expr)[0] );
+    only_left = JSON_NewInfoCVars();
+    JSON_CopyInfoCVars( only_left, INFO_FEXP(CURR_FUNC) );
 
-    Emit(", \"right\":");
+    JSON_Emit(", \"right\":");
 
     /* emit the code for the case that the left value is 'false'           */
-    //Emit( "if ( %c == False ) {\n", left );
-    //Emit( "%c = %c;\n", val, left );
-    //Emit( "}\n" );
+    //JSON_Emit( "if ( %c == False ) {\n", left );
+    //JSON_Emit( "%c = %c;\n", val, left );
+    //JSON_Emit( "}\n" );
 
     /* emit the code for the case that the left value is 'true'            */
-    //Emit( "else if ( %c == True ) {\n", left );
-    right1 = CompExpr( ADDR_EXPR(expr)[1] );
-    CompCheckBool( right1 );
-    //Emit( "%c = %c;\n", val, right1 );
-    //Emit( "}\n" );
+    //JSON_Emit( "else if ( %c == True ) {\n", left );
+    right1 = JSON_CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_CompCheckBool( right1 );
+    //JSON_Emit( "%c = %c;\n", val, right1 );
+    //JSON_Emit( "}\n" );
 
     /* emit the code for the case that the left value is a filter          */
-    //Emit( "else {\n" );
-    //right2 = CompExpr( ADDR_EXPR(expr)[1] );
-    //Emit( "%c = NewAndFilter( %c, %c );\n", val, left, right2 );
-    //Emit( "}\n" );
+    //JSON_Emit( "else {\n" );
+    //right2 = JSON_CompExpr( ADDR_EXPR(expr)[1] );
+    //JSON_Emit( "%c = NewAndFilter( %c, %c );\n", val, left, right2 );
+    //JSON_Emit( "}\n" );
 
     /* we know precious little about the result                            */
-    MergeInfoCVars( INFO_FEXP(CURR_FUNC), only_left );
-    SetInfoCVar( val, W_BOUND );
+    JSON_MergeInfoCVars( INFO_FEXP(CURR_FUNC), only_left );
+    JSON_SetInfoCVar( val, W_BOUND );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right2 ) )  FreeTemp( TEMP_CVAR( right2 ) );
-    if ( IS_TEMP_CVAR( right1 ) )  FreeTemp( TEMP_CVAR( right1 ) );
-    if ( IS_TEMP_CVAR( left   ) )  FreeTemp( TEMP_CVAR( left   ) );
+    if ( IS_TEMP_CVAR( right2 ) )  JSON_FreeTemp( TEMP_CVAR( right2 ) );
+    if ( IS_TEMP_CVAR( right1 ) )  JSON_FreeTemp( TEMP_CVAR( right1 ) );
+    if ( IS_TEMP_CVAR( left   ) )  JSON_FreeTemp( TEMP_CVAR( left   ) );
 
     /* return the result                                                   */
     return val;
@@ -1385,9 +1384,9 @@ CVar CompAnd (
 
 /****************************************************************************
 **
-*F  CompAndBool( <expr> ) . . . . . . . . . . . . . . . . . . . . . . . T_AND
+*F  JSON_CompAndBool( <expr> ) . . . . . . . . . . . . . . . . . . . . . . . T_AND
 */
-CVar CompAndBool (
+CVar JSON_CompAndBool (
     Expr                expr )
 {
     CVar                val;            /* or, result                      */
@@ -1396,34 +1395,34 @@ CVar CompAndBool (
     Bag                 only_left;      /* info after evaluating only left */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"andBool\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"andBool\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the left expression                                         */
-    left = CompBoolExpr( ADDR_EXPR(expr)[0] );
-    //Emit( "%c = %c;\n", val, left );
-    //Emit( "if ( %c ) {\n", val );
-    only_left = NewInfoCVars();
-    CopyInfoCVars( only_left, INFO_FEXP(CURR_FUNC) );
+    left = JSON_CompBoolExpr( ADDR_EXPR(expr)[0] );
+    //JSON_Emit( "%c = %c;\n", val, left );
+    //JSON_Emit( "if ( %c ) {\n", val );
+    only_left = JSON_NewInfoCVars();
+    JSON_CopyInfoCVars( only_left, INFO_FEXP(CURR_FUNC) );
 
-    Emit(", \"right\":");
+    JSON_Emit(", \"right\":");
 
     /* compile the right expression                                        */
-    right = CompBoolExpr( ADDR_EXPR(expr)[1] );
-    //Emit( "%c = %c;\n", val, right );
-    //Emit( "}\n" );
+    right = JSON_CompBoolExpr( ADDR_EXPR(expr)[1] );
+    //JSON_Emit( "%c = %c;\n", val, right );
+    //JSON_Emit( "}\n" );
 
     /* we know that the result is boolean (should be 'W_CBOOL')            */
-    MergeInfoCVars( INFO_FEXP(CURR_FUNC), only_left );
-    SetInfoCVar( val, W_BOOL );
+    JSON_MergeInfoCVars( INFO_FEXP(CURR_FUNC), only_left );
+    JSON_SetInfoCVar( val, W_BOOL );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -1432,33 +1431,33 @@ CVar CompAndBool (
 
 /****************************************************************************
 **
-*F  CompNot( <expr> ) . . . . . . . . . . . . . . . . . . . . . . . . . T_NOT
+*F  JSON_CompNot( <expr> ) . . . . . . . . . . . . . . . . . . . . . . . . . T_NOT
 */
-CVar CompNot (
+CVar JSON_CompNot (
     Expr                expr )
 {
     CVar                val;            /* result                          */
     CVar                left;           /* operand                         */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"not\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"not\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the operand                                                 */
-    left = CompBoolExpr( ADDR_EXPR(expr)[0] );
+    left = JSON_CompBoolExpr( ADDR_EXPR(expr)[0] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* invert the operand                                                  */
-    //Emit( "%c = (%c ? False : True);\n", val, left );
+    //JSON_Emit( "%c = (%c ? False : True);\n", val, left );
 
     /* we know that the result is boolean                                  */
-    SetInfoCVar( val, W_BOOL );
+    JSON_SetInfoCVar( val, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( left ) )  FreeTemp( TEMP_CVAR( left ) );
+    if ( IS_TEMP_CVAR( left ) )  JSON_FreeTemp( TEMP_CVAR( left ) );
 
     /* return the result                                                   */
     return val;
@@ -1467,33 +1466,33 @@ CVar CompNot (
 
 /****************************************************************************
 **
-*F  CompNotBoot( <expr> ) . . . . . . . . . . . . . . . . . . . . . . . T_NOT
+*F  JSON_CompNotBoot( <expr> ) . . . . . . . . . . . . . . . . . . . . . . . T_NOT
 */
-CVar CompNotBool (
+CVar JSON_CompNotBool (
     Expr                expr )
 {
     CVar                val;            /* result                          */
     CVar                left;           /* operand                         */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"notBool\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"notBool\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the operand                                                 */
-    left = CompBoolExpr( ADDR_EXPR(expr)[0] );
+    left = JSON_CompBoolExpr( ADDR_EXPR(expr)[0] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* invert the operand                                                  */
-    //Emit( "%c = (Obj)(UInt)( ! ((Int)%c) );\n", val, left );
+    //JSON_Emit( "%c = (Obj)(UInt)( ! ((Int)%c) );\n", val, left );
 
     /* we know that the result is boolean                                  */
-    SetInfoCVar( val, W_BOOL );
+    JSON_SetInfoCVar( val, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( left ) )  FreeTemp( TEMP_CVAR( left ) );
+    if ( IS_TEMP_CVAR( left ) )  JSON_FreeTemp( TEMP_CVAR( left ) );
 
     /* return the result                                                   */
     return val;
@@ -1502,9 +1501,9 @@ CVar CompNotBool (
 
 /****************************************************************************
 **
-*F  CompEq( <expr> )  . . . . . . . . . . . . . . . . . . . . . . . . .  T_EQ
+*F  JSON_CompEq( <expr> )  . . . . . . . . . . . . . . . . . . . . . . . . .  T_EQ
 */
-CVar CompEq (
+CVar JSON_CompEq (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -1512,33 +1511,33 @@ CVar CompEq (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"Eq\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"Eq\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code                                                       */
-    if ( HasInfoCVar(left,W_INT_SMALL) && HasInfoCVar(right,W_INT_SMALL) ) {
-//Emit("%c = ((((Int)%c) == ((Int)%c)) ? True : False);\n", val, left, right);
+    if ( JSON_HasInfoCVar(left,W_INT_SMALL) && JSON_HasInfoCVar(right,W_INT_SMALL) ) {
+//JSON_Emit("%c = ((((Int)%c) == ((Int)%c)) ? True : False);\n", val, left, right);
     }
     else {
-        //Emit( "%c = (EQ( %c, %c ) ? True : False);\n", val, left, right );
+        //JSON_Emit( "%c = (EQ( %c, %c ) ? True : False);\n", val, left, right );
     }
 
     /* we know that the result is boolean                                  */
-    SetInfoCVar( val, W_BOOL );
+    JSON_SetInfoCVar( val, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -1547,9 +1546,9 @@ CVar CompEq (
 
 /****************************************************************************
 **
-*F  CompEqBool( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_EQ
+*F  JSON_CompEqBool( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_EQ
 */
-CVar CompEqBool (
+CVar JSON_CompEqBool (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -1557,33 +1556,33 @@ CVar CompEqBool (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"EqBool\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"EqBool\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code                                                       */
-    if ( HasInfoCVar(left,W_INT_SMALL) && HasInfoCVar(right,W_INT_SMALL) ) {
-        //Emit( "%c = (Obj)(UInt)(((Int)%c) == ((Int)%c));\n", val, left, right);
+    if ( JSON_HasInfoCVar(left,W_INT_SMALL) && JSON_HasInfoCVar(right,W_INT_SMALL) ) {
+        //JSON_Emit( "%c = (Obj)(UInt)(((Int)%c) == ((Int)%c));\n", val, left, right);
     }
     else {
-        //Emit( "%c = (Obj)(UInt)(EQ( %c, %c ));\n", val, left, right );
+        //JSON_Emit( "%c = (Obj)(UInt)(EQ( %c, %c ));\n", val, left, right );
     }
 
     /* we know that the result is boolean (should be 'W_CBOOL')            */
-    SetInfoCVar( val, W_BOOL );
+    JSON_SetInfoCVar( val, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -1592,9 +1591,9 @@ CVar CompEqBool (
 
 /****************************************************************************
 **
-*F  CompNe( <expr> )  . . . . . . . . . . . . . . . . . . . . . . . . .  T_NE
+*F  JSON_CompNe( <expr> )  . . . . . . . . . . . . . . . . . . . . . . . . .  T_NE
 */
-CVar CompNe (
+CVar JSON_CompNe (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -1602,33 +1601,33 @@ CVar CompNe (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"notEqual\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"notEqual\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code                                                       */
-    if ( HasInfoCVar(left,W_INT_SMALL) && HasInfoCVar(right,W_INT_SMALL) ) {
-//Emit("%c = ((((Int)%c) == ((Int)%c)) ? False : True);\n", val, left, right);
+    if ( JSON_HasInfoCVar(left,W_INT_SMALL) && JSON_HasInfoCVar(right,W_INT_SMALL) ) {
+//JSON_Emit("%c = ((((Int)%c) == ((Int)%c)) ? False : True);\n", val, left, right);
     }
     else {
-        //Emit( "%c = (EQ( %c, %c ) ? False : True);\n", val, left, right );
+        //JSON_Emit( "%c = (EQ( %c, %c ) ? False : True);\n", val, left, right );
     }
 
     /* we know that the result is boolean                                  */
-    SetInfoCVar( val, W_BOOL );
+    JSON_SetInfoCVar( val, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -1637,9 +1636,9 @@ CVar CompNe (
 
 /****************************************************************************
 **
-*F  CompNeBool( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_NE
+*F  JSON_CompNeBool( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_NE
 */
-CVar CompNeBool (
+CVar JSON_CompNeBool (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -1647,33 +1646,33 @@ CVar CompNeBool (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"notEqualBool\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"notEqualBool\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code                                                       */
-    if ( HasInfoCVar(left,W_INT_SMALL) && HasInfoCVar(right,W_INT_SMALL) ) {
-        //Emit( "%c = (Obj)(UInt)(((Int)%c) != ((Int)%c));\n", val, left, right );
+    if ( JSON_HasInfoCVar(left,W_INT_SMALL) && JSON_HasInfoCVar(right,W_INT_SMALL) ) {
+        //JSON_Emit( "%c = (Obj)(UInt)(((Int)%c) != ((Int)%c));\n", val, left, right );
     }
     else {
-        //Emit( "%c = (Obj)(UInt)( ! EQ( %c, %c ));\n", val, left, right );
+        //JSON_Emit( "%c = (Obj)(UInt)( ! EQ( %c, %c ));\n", val, left, right );
     }
 
     /* we know that the result is boolean (should be 'W_CBOOL')            */
-    SetInfoCVar( val, W_BOOL );
+    JSON_SetInfoCVar( val, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -1682,9 +1681,9 @@ CVar CompNeBool (
 
 /****************************************************************************
 **
-*F  CompLt( <expr> )  . . . . . . . . . . . . . . . . . . . . . . . . .  T_LT
+*F  JSON_CompLt( <expr> )  . . . . . . . . . . . . . . . . . . . . . . . . .  T_LT
 */
-CVar CompLt (
+CVar JSON_CompLt (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -1692,33 +1691,33 @@ CVar CompLt (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"lessThan\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"lessThan\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code                                                       */
-    if ( HasInfoCVar(left,W_INT_SMALL) && HasInfoCVar(right,W_INT_SMALL) ) {
-//Emit( "%c = ((((Int)%c) < ((Int)%c)) ? True : False);\n", val, left, right );
+    if ( JSON_HasInfoCVar(left,W_INT_SMALL) && JSON_HasInfoCVar(right,W_INT_SMALL) ) {
+//JSON_Emit( "%c = ((((Int)%c) < ((Int)%c)) ? True : False);\n", val, left, right );
     }
     else {
-        //Emit( "%c = (LT( %c, %c ) ? True : False);\n", val, left, right );
+        //JSON_Emit( "%c = (LT( %c, %c ) ? True : False);\n", val, left, right );
     }
 
     /* we know that the result is boolean                                  */
-    SetInfoCVar( val, W_BOOL );
+    JSON_SetInfoCVar( val, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -1727,9 +1726,9 @@ CVar CompLt (
 
 /****************************************************************************
 **
-*F  CompLtBool( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_LT
+*F  JSON_CompLtBool( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_LT
 */
-CVar CompLtBool (
+CVar JSON_CompLtBool (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -1737,33 +1736,33 @@ CVar CompLtBool (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"lessThanBool\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"lessThanBool\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
    
     /* emit the code                                                       */
-    if ( HasInfoCVar(left,W_INT_SMALL) && HasInfoCVar(right,W_INT_SMALL) ) {
-        //Emit( "%c = (Obj)(UInt)(((Int)%c) < ((Int)%c));\n", val, left, right );
+    if ( JSON_HasInfoCVar(left,W_INT_SMALL) && JSON_HasInfoCVar(right,W_INT_SMALL) ) {
+        //JSON_Emit( "%c = (Obj)(UInt)(((Int)%c) < ((Int)%c));\n", val, left, right );
     }
     else {
-        //Emit( "%c = (Obj)(UInt)(LT( %c, %c ));\n", val, left, right );
+        //JSON_Emit( "%c = (Obj)(UInt)(LT( %c, %c ));\n", val, left, right );
     }
 
     /* we know that the result is boolean (should be 'W_CBOOL')            */
-    SetInfoCVar( val, W_BOOL );
+    JSON_SetInfoCVar( val, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -1772,9 +1771,9 @@ CVar CompLtBool (
 
 /****************************************************************************
 **
-*F  CompGe( <expr> )  . . . . . . . . . . . . . . . . . . . . . . . . .  T_GE
+*F  JSON_CompGe( <expr> )  . . . . . . . . . . . . . . . . . . . . . . . . .  T_GE
 */
-CVar CompGe (
+CVar JSON_CompGe (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -1782,33 +1781,33 @@ CVar CompGe (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"greaterEqual\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"greaterEqual\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code                                                       */
-    if ( HasInfoCVar(left,W_INT_SMALL) && HasInfoCVar(right,W_INT_SMALL) ) {
- //Emit("%c = ((((Int)%c) < ((Int)%c)) ? False : True);\n", val, left, right);
+    if ( JSON_HasInfoCVar(left,W_INT_SMALL) && JSON_HasInfoCVar(right,W_INT_SMALL) ) {
+ //JSON_Emit("%c = ((((Int)%c) < ((Int)%c)) ? False : True);\n", val, left, right);
     }
     else {
-        //Emit( "%c = (LT( %c, %c ) ? False : True);\n", val, left, right );
+        //JSON_Emit( "%c = (LT( %c, %c ) ? False : True);\n", val, left, right );
     }
 
     /* we know that the result is boolean                                  */
-    SetInfoCVar( val, W_BOOL );
+    JSON_SetInfoCVar( val, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -1817,9 +1816,9 @@ CVar CompGe (
 
 /****************************************************************************
 **
-*F  CompGeBool( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_GE
+*F  JSON_CompGeBool( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_GE
 */
-CVar CompGeBool (
+CVar JSON_CompGeBool (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -1827,33 +1826,33 @@ CVar CompGeBool (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"greaterEqualBool\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"greaterEqualBool\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code                                                       */
-    if ( HasInfoCVar(left,W_INT_SMALL) && HasInfoCVar(right,W_INT_SMALL) ) {
-        //Emit( "%c = (Obj)(UInt)(((Int)%c) >= ((Int)%c));\n", val, left, right );
+    if ( JSON_HasInfoCVar(left,W_INT_SMALL) && JSON_HasInfoCVar(right,W_INT_SMALL) ) {
+        //JSON_Emit( "%c = (Obj)(UInt)(((Int)%c) >= ((Int)%c));\n", val, left, right );
     }
     else {
-        //Emit( "%c = (Obj)(UInt)(! LT( %c, %c ));\n", val, left, right );
+        //JSON_Emit( "%c = (Obj)(UInt)(! LT( %c, %c ));\n", val, left, right );
     }
 
     /* we know that the result is boolean (should be 'W_CBOOL')            */
-    SetInfoCVar( val, W_BOOL );
+    JSON_SetInfoCVar( val, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -1862,9 +1861,9 @@ CVar CompGeBool (
 
 /****************************************************************************
 **
-*F  CompGt( <expr> )  . . . . . . . . . . . . . . . . . . . . . . . . .  T_GT
+*F  JSON_CompGt( <expr> )  . . . . . . . . . . . . . . . . . . . . . . . . .  T_GT
 */
-CVar CompGt (
+CVar JSON_CompGt (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -1872,33 +1871,33 @@ CVar CompGt (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"greaterThan\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"greaterThan\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
    
     /* emit the code                                                       */
-    if ( HasInfoCVar(left,W_INT_SMALL) && HasInfoCVar(right,W_INT_SMALL) ) {
- //Emit("%c = ((((Int)%c) < ((Int)%c)) ? True : False);\n", val, right, left);
+    if ( JSON_HasInfoCVar(left,W_INT_SMALL) && JSON_HasInfoCVar(right,W_INT_SMALL) ) {
+ //JSON_Emit("%c = ((((Int)%c) < ((Int)%c)) ? True : False);\n", val, right, left);
     }
     else {
-        //Emit( "%c = (LT( %c, %c ) ? True : False);\n", val, right, left );
+        //JSON_Emit( "%c = (LT( %c, %c ) ? True : False);\n", val, right, left );
     }
 
     /* we know that the result is boolean                                  */
-    SetInfoCVar( val, W_BOOL );
+    JSON_SetInfoCVar( val, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -1907,9 +1906,9 @@ CVar CompGt (
 
 /****************************************************************************
 **
-*F  CompGtBool( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_GT
+*F  JSON_CompGtBool( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_GT
 */
-CVar CompGtBool (
+CVar JSON_CompGtBool (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -1917,33 +1916,33 @@ CVar CompGtBool (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"greaterThanBool\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"greaterThanBool\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
    
     /* emit the code                                                       */
-    if ( HasInfoCVar(left,W_INT_SMALL) && HasInfoCVar(right,W_INT_SMALL) ) {
-        //Emit( "%c = (Obj)(UInt)(((Int)%c) < ((Int)%c));\n", val, right, left );
+    if ( JSON_HasInfoCVar(left,W_INT_SMALL) && JSON_HasInfoCVar(right,W_INT_SMALL) ) {
+        //JSON_Emit( "%c = (Obj)(UInt)(((Int)%c) < ((Int)%c));\n", val, right, left );
     }
     else {
-        //Emit( "%c = (Obj)(UInt)(LT( %c, %c ));\n", val, right, left );
+        //JSON_Emit( "%c = (Obj)(UInt)(LT( %c, %c ));\n", val, right, left );
     }
 
     /* we know that the result is boolean (should be 'W_CBOOL')            */
-    SetInfoCVar( val, W_BOOL );
+    JSON_SetInfoCVar( val, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -1952,9 +1951,9 @@ CVar CompGtBool (
 
 /****************************************************************************
 **
-*F  CompLe( <expr> )  . . . . . . . . . . . . . . . . . . . . . . . . .  T_LE
+*F  JSON_CompLe( <expr> )  . . . . . . . . . . . . . . . . . . . . . . . . .  T_LE
 */
-CVar CompLe (
+CVar JSON_CompLe (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -1962,33 +1961,33 @@ CVar CompLe (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"lessEqual\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"lessEqual\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
    
     /* emit the code                                                       */
-    if ( HasInfoCVar(left,W_INT_SMALL) && HasInfoCVar(right,W_INT_SMALL) ) {
-//Emit("%c = ((((Int)%c) < ((Int)%c)) ?  False : True);\n", val, right, left);
+    if ( JSON_HasInfoCVar(left,W_INT_SMALL) && JSON_HasInfoCVar(right,W_INT_SMALL) ) {
+//JSON_Emit("%c = ((((Int)%c) < ((Int)%c)) ?  False : True);\n", val, right, left);
     }
     else {
-        //Emit( "%c = (LT( %c, %c ) ?  False : True);\n", val, right, left );
+        //JSON_Emit( "%c = (LT( %c, %c ) ?  False : True);\n", val, right, left );
     }
 
     /* we know that the result is boolean                                  */
-    SetInfoCVar( val, W_BOOL );
+    JSON_SetInfoCVar( val, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -1997,9 +1996,9 @@ CVar CompLe (
 
 /****************************************************************************
 **
-*F  CompLeBool( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_LE
+*F  JSON_CompLeBool( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_LE
 */
-CVar            CompLeBool (
+CVar            JSON_CompLeBool (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -2007,33 +2006,33 @@ CVar            CompLeBool (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"lessEqualBool\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"lessEqualBool\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code                                                       */
-    if ( HasInfoCVar(left,W_INT_SMALL) && HasInfoCVar(right,W_INT_SMALL) ) {
-        //Emit( "%c = (Obj)(UInt)(((Int)%c) >= ((Int)%c));\n", val, right, left );
+    if ( JSON_HasInfoCVar(left,W_INT_SMALL) && JSON_HasInfoCVar(right,W_INT_SMALL) ) {
+        //JSON_Emit( "%c = (Obj)(UInt)(((Int)%c) >= ((Int)%c));\n", val, right, left );
     }
     else {
-        //Emit( "%c = (Obj)(UInt)(! LT( %c, %c ));\n", val, right, left );
+        //JSON_Emit( "%c = (Obj)(UInt)(! LT( %c, %c ));\n", val, right, left );
     }
 
     /* we know that the result is boolean (should be 'W_CBOOL')            */
-    SetInfoCVar( val, W_BOOL );
+    JSON_SetInfoCVar( val, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -2042,9 +2041,9 @@ CVar            CompLeBool (
 
 /****************************************************************************
 **
-*F  CompIn( <expr> )  . . . . . . . . . . . . . . . . . . . . . . . . .  T_IN
+*F  JSON_CompIn( <expr> )  . . . . . . . . . . . . . . . . . . . . . . . . .  T_IN
 */
-CVar CompIn (
+CVar JSON_CompIn (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -2052,28 +2051,28 @@ CVar CompIn (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"in\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"in\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code                                                       */
-    //Emit( "%c = (IN( %c, %c ) ?  True : False);\n", val, left, right );
+    //JSON_Emit( "%c = (IN( %c, %c ) ?  True : False);\n", val, left, right );
 
     /* we know that the result is boolean                                  */
-    SetInfoCVar( val, W_BOOL );
+    JSON_SetInfoCVar( val, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -2082,9 +2081,9 @@ CVar CompIn (
 
 /****************************************************************************
 **
-*F  CompInBool( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_IN
+*F  JSON_CompInBool( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_IN
 */
-CVar CompInBool (
+CVar JSON_CompInBool (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -2092,28 +2091,28 @@ CVar CompInBool (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"BoolExpr\", \"subtype\":\"inBool\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"BoolExpr\", \"subtype\":\"inBool\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code                                                       */
-    //Emit( "%c = (Obj)(UInt)(IN( %c, %c ));\n", val, left, right );
+    //JSON_Emit( "%c = (Obj)(UInt)(IN( %c, %c ));\n", val, left, right );
 
     /* we know that the result is boolean (should be 'W_CBOOL')            */
-    SetInfoCVar( val, W_BOOL );
+    JSON_SetInfoCVar( val, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -2122,9 +2121,9 @@ CVar CompInBool (
 
 /****************************************************************************
 **
-*F  CompSum( <expr> ) . . . . . . . . . . . . . . . . . . . . . . . . . T_SUM
+*F  JSON_CompSum( <expr> ) . . . . . . . . . . . . . . . . . . . . . . . . . T_SUM
 */
-CVar CompSum (
+CVar JSON_CompSum (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -2132,41 +2131,41 @@ CVar CompSum (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"arithmetic\", \"subtype\":\"sum\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"arithmetic\", \"subtype\":\"sum\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code                                                       */
-    if ( HasInfoCVar(left,W_INT_SMALL) && HasInfoCVar(right,W_INT_SMALL) ) {
-        //Emit( "C_SUM_INTOBJS( %c, %c, %c )\n", val, left, right );
+    if ( JSON_HasInfoCVar(left,W_INT_SMALL) && JSON_HasInfoCVar(right,W_INT_SMALL) ) {
+        //JSON_Emit( "C_SUM_INTOBJS( %c, %c, %c )\n", val, left, right );
     }
-    else if ( CompFastIntArith ) {
-        //Emit( "C_SUM_FIA( %c, %c, %c )\n", val, left, right );
+    else if ( JSON_CompFastIntArith ) {
+        //JSON_Emit( "C_SUM_FIA( %c, %c, %c )\n", val, left, right );
     }
     else {
-        //Emit( "C_SUM( %c, %c, %c )\n", val, left, right );
+        //JSON_Emit( "C_SUM( %c, %c, %c )\n", val, left, right );
     }
 
     /* set the information for the result                                  */
-    if ( HasInfoCVar(left,W_INT) && HasInfoCVar(right,W_INT) ) {
-        SetInfoCVar( val, W_INT );
+    if ( JSON_HasInfoCVar(left,W_INT) && JSON_HasInfoCVar(right,W_INT) ) {
+        JSON_SetInfoCVar( val, W_INT );
     }
     else {
-        SetInfoCVar( val, W_BOUND );
+        JSON_SetInfoCVar( val, W_BOUND );
     }
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -2175,46 +2174,46 @@ CVar CompSum (
 
 /****************************************************************************
 **
-*F  CompAInv( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_AINV
+*F  JSON_CompAInv( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_AINV
 */
-CVar CompAInv (
+CVar JSON_CompAInv (
     Expr                expr )
 {
     CVar                val;            /* result                          */
     CVar                left;           /* left operand                    */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"arithmetic\", \"subtype\":\"aInv\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"arithmetic\", \"subtype\":\"aInv\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code                                                       */
-    if ( HasInfoCVar(left,W_INT_SMALL) ) {
-        //Emit( "C_AINV_INTOBJS( %c, %c )\n", val, left );
+    if ( JSON_HasInfoCVar(left,W_INT_SMALL) ) {
+        //JSON_Emit( "C_AINV_INTOBJS( %c, %c )\n", val, left );
     }
-    else if ( CompFastIntArith ) {
-        //Emit( "C_AINV_FIA( %c, %c )\n", val, left );
+    else if ( JSON_CompFastIntArith ) {
+        //JSON_Emit( "C_AINV_FIA( %c, %c )\n", val, left );
     }
     else {
-        //Emit( "C_AINV( %c, %c )\n", val, left );
+        //JSON_Emit( "C_AINV( %c, %c )\n", val, left );
     }
 
     /* set the information for the result                                  */
-    if ( HasInfoCVar(left,W_INT) ) {
-        SetInfoCVar( val, W_INT );
+    if ( JSON_HasInfoCVar(left,W_INT) ) {
+        JSON_SetInfoCVar( val, W_INT );
     }
     else {
-        SetInfoCVar( val, W_BOUND );
+        JSON_SetInfoCVar( val, W_BOUND );
     }
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -2223,9 +2222,9 @@ CVar CompAInv (
 
 /****************************************************************************
 **
-*F  CompDiff( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_DIFF
+*F  JSON_CompDiff( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_DIFF
 */
-CVar CompDiff (
+CVar JSON_CompDiff (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -2233,41 +2232,41 @@ CVar CompDiff (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"arithmetic\", \"subtype\":\"diff\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"arithmetic\", \"subtype\":\"diff\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code                                                       */
-    if ( HasInfoCVar(left,W_INT_SMALL) && HasInfoCVar(right,W_INT_SMALL) ) {
-        //Emit( "C_DIFF_INTOBJS( %c, %c, %c )\n", val, left, right );
+    if ( JSON_HasInfoCVar(left,W_INT_SMALL) && JSON_HasInfoCVar(right,W_INT_SMALL) ) {
+        //JSON_Emit( "C_DIFF_INTOBJS( %c, %c, %c )\n", val, left, right );
     }
-    else if ( CompFastIntArith ) {
-        //Emit( "C_DIFF_FIA( %c, %c, %c )\n", val, left, right );
+    else if ( JSON_CompFastIntArith ) {
+        //JSON_Emit( "C_DIFF_FIA( %c, %c, %c )\n", val, left, right );
     }
     else {
-        //Emit( "C_DIFF( %c, %c, %c )\n", val, left, right );
+        //JSON_Emit( "C_DIFF( %c, %c, %c )\n", val, left, right );
     }
 
     /* set the information for the result                                  */
-    if ( HasInfoCVar(left,W_INT) && HasInfoCVar(right,W_INT) ) {
-        SetInfoCVar( val, W_INT );
+    if ( JSON_HasInfoCVar(left,W_INT) && JSON_HasInfoCVar(right,W_INT) ) {
+        JSON_SetInfoCVar( val, W_INT );
     }
     else {
-        SetInfoCVar( val, W_BOUND );
+        JSON_SetInfoCVar( val, W_BOUND );
     }
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -2276,9 +2275,9 @@ CVar CompDiff (
 
 /****************************************************************************
 **
-*F  CompProd( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_PROD
+*F  JSON_CompProd( <expr> )  . . . . . . . . . . . . . . . . . . . . . . .  T_PROD
 */
-CVar CompProd (
+CVar JSON_CompProd (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -2286,41 +2285,41 @@ CVar CompProd (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"arithmetic\", \"subtype\":\"prod\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"arithmetic\", \"subtype\":\"prod\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code                                                       */
-    if ( HasInfoCVar(left,W_INT_SMALL) && HasInfoCVar(right,W_INT_SMALL) ) {
-        //Emit( "C_PROD_INTOBJS( %c, %c, %c )\n", val, left, right );
+    if ( JSON_HasInfoCVar(left,W_INT_SMALL) && JSON_HasInfoCVar(right,W_INT_SMALL) ) {
+        //JSON_Emit( "C_PROD_INTOBJS( %c, %c, %c )\n", val, left, right );
     }
-    else if ( CompFastIntArith ) {
-        //Emit( "C_PROD_FIA( %c, %c, %c )\n", val, left, right );
+    else if ( JSON_CompFastIntArith ) {
+        //JSON_Emit( "C_PROD_FIA( %c, %c, %c )\n", val, left, right );
     }
     else {
-        //Emit( "C_PROD( %c, %c, %c )\n", val, left, right );
+        //JSON_Emit( "C_PROD( %c, %c, %c )\n", val, left, right );
     }
 
     /* set the information for the result                                  */
-    if ( HasInfoCVar(left,W_INT) && HasInfoCVar(right,W_INT) ) {
-        SetInfoCVar( val, W_INT );
+    if ( JSON_HasInfoCVar(left,W_INT) && JSON_HasInfoCVar(right,W_INT) ) {
+        JSON_SetInfoCVar( val, W_INT );
     }
     else {
-        SetInfoCVar( val, W_BOUND );
+        JSON_SetInfoCVar( val, W_BOUND );
     }
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -2329,36 +2328,36 @@ CVar CompProd (
 
 /****************************************************************************
 **
-*F  CompInv( <expr> ) . . . . . . . . . . . . . . . . . . . . . . . . . T_INV
+*F  JSON_CompInv( <expr> ) . . . . . . . . . . . . . . . . . . . . . . . . . T_INV
 **
 ** C_INV is not defined, so I guess this never gets called SL
 **
 */
-CVar CompInv (
+CVar JSON_CompInv (
     Expr                expr )
 {
     CVar                val;            /* result                          */
     CVar                left;           /* left operand                    */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"arithmetic\", \"subtype\":\"inv\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"arithmetic\", \"subtype\":\"inv\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the operands                                                */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code                                                       */
-    //Emit( "C_INV( %c, %c )\n", val, left );
+    //JSON_Emit( "C_INV( %c, %c )\n", val, left );
 
     /* set the information for the result                                  */
-    SetInfoCVar( val, W_BOUND );
+    JSON_SetInfoCVar( val, W_BOUND );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -2367,9 +2366,9 @@ CVar CompInv (
 
 /****************************************************************************
 **
-*F  CompQuo( <expr> ) . . . . . . . . . . . . . . . . . . . . . . . . . T_QUO
+*F  JSON_CompQuo( <expr> ) . . . . . . . . . . . . . . . . . . . . . . . . . T_QUO
 */
-CVar CompQuo (
+CVar JSON_CompQuo (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -2377,28 +2376,28 @@ CVar CompQuo (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"arithmetic\", \"subtype\":\"quo\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"arithmetic\", \"subtype\":\"quo\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code                                                       */
-    //Emit( "%c = QUO( %c, %c );\n", val, left, right );
+    //JSON_Emit( "%c = QUO( %c, %c );\n", val, left, right );
 
     /* set the information for the result                                  */
-    SetInfoCVar( val, W_BOUND );
+    JSON_SetInfoCVar( val, W_BOUND );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -2407,9 +2406,9 @@ CVar CompQuo (
 
 /****************************************************************************
 **
-*F  CompMod( <expr> ) . . . . . . . . . . . . . . . . . . . . . . . . . T_MOD
+*F  JSON_CompMod( <expr> ) . . . . . . . . . . . . . . . . . . . . . . . . . T_MOD
 */
-CVar CompMod (
+CVar JSON_CompMod (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -2417,33 +2416,33 @@ CVar CompMod (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"arithmetic\", \"subtype\":\"mod\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"arithmetic\", \"subtype\":\"mod\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code                                                       */
-    //Emit( "%c = MOD( %c, %c );\n", val, left, right );
+    //JSON_Emit( "%c = MOD( %c, %c );\n", val, left, right );
 
     /* set the information for the result                                  */
-    if ( HasInfoCVar(left,W_INT) && HasInfoCVar(right,W_INT) ) {
-        SetInfoCVar( val, W_INT );
+    if ( JSON_HasInfoCVar(left,W_INT) && JSON_HasInfoCVar(right,W_INT) ) {
+        JSON_SetInfoCVar( val, W_INT );
     }
     else {
-        SetInfoCVar( val, W_BOUND );
+        JSON_SetInfoCVar( val, W_BOUND );
     }
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -2452,9 +2451,9 @@ CVar CompMod (
 
 /****************************************************************************
 **
-*F  CompPow( <expr> ) . . . . . . . . . . . . . . . . . . . . . . . . . T_POW
+*F  JSON_CompPow( <expr> ) . . . . . . . . . . . . . . . . . . . . . . . . . T_POW
 */
-CVar CompPow (
+CVar JSON_CompPow (
     Expr                expr )
 {
     CVar                val;            /* result                          */
@@ -2462,33 +2461,33 @@ CVar CompPow (
     CVar                right;          /* right operand                   */
 
     /* allocate a new temporary for the result                             */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"arithmetic\", \"subtype\":\"pow\", ");
-    Emit("\"left\":");
+    JSON_Emit("{\"type\":\"arithmetic\", \"subtype\":\"pow\", ");
+    JSON_Emit("\"left\":");
 
     /* compile the two operands                                            */
-    left  = CompExpr( ADDR_EXPR(expr)[0] );
+    left  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"right\":");
-    right = CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_Emit(", \"right\":");
+    right = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code                                                       */
-    //Emit( "%c = POW( %c, %c );\n", val, left, right );
+    //JSON_Emit( "%c = POW( %c, %c );\n", val, left, right );
 
     /* set the information for the result                                  */
-    if ( HasInfoCVar(left,W_INT) && HasInfoCVar(right,W_INT) ) {
-        SetInfoCVar( val, W_INT );
+    if ( JSON_HasInfoCVar(left,W_INT) && JSON_HasInfoCVar(right,W_INT) ) {
+        JSON_SetInfoCVar( val, W_INT );
     }
     else {
-        SetInfoCVar( val, W_BOUND );
+        JSON_SetInfoCVar( val, W_BOUND );
     }
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( right ) )  FreeTemp( TEMP_CVAR( right ) );
-    if ( IS_TEMP_CVAR( left  ) )  FreeTemp( TEMP_CVAR( left  ) );
+    if ( IS_TEMP_CVAR( right ) )  JSON_FreeTemp( TEMP_CVAR( right ) );
+    if ( IS_TEMP_CVAR( left  ) )  JSON_FreeTemp( TEMP_CVAR( left  ) );
 
     /* return the result                                                   */
     return val;
@@ -2497,7 +2496,7 @@ CVar CompPow (
 
 /****************************************************************************
 **
-*F  CompIntExpr( <expr> ) . . . . . . . . . . . . . . .  T_INTEXPR/T_INT_EXPR
+*F  JSON_CompIntExpr( <expr> ) . . . . . . . . . . . . . . .  T_INTEXPR/T_INT_EXPR
 *
 * This is complicated by the need to produce code that will compile correctly
 * in 32 or 64 bit and with or without GMP.
@@ -2516,7 +2515,7 @@ CVar CompPow (
 *
 */
 
-CVar CompIntExpr (
+CVar JSON_CompIntExpr (
     Expr                expr )
 {
     CVar                val;
@@ -2525,35 +2524,35 @@ CVar CompIntExpr (
     UInt                typ;
 
     if ( IS_INTEXPR(expr) ) {
-        Emit("%d", INT_INTEXPR(expr));
+        JSON_Emit("%d", INT_INTEXPR(expr));
         return CVAR_INTG( INT_INTEXPR(expr) );
     }
     else {
-        val = CVAR_TEMP( NewTemp( "val" ) );
+        val = CVAR_TEMP( JSON_NewTemp( "val" ) );
         siz = SIZE_EXPR(expr) - sizeof(UInt);
 	typ = *(UInt *)ADDR_EXPR(expr);
-	//Emit( "%c = C_MAKE_INTEGER_BAG(%d, %d);\n",val, siz, typ);
-        Emit("%d", val);
+	//JSON_Emit( "%c = C_MAKE_INTEGER_BAG(%d, %d);\n",val, siz, typ);
+        JSON_Emit("%d", val);
         if ( typ == T_INTPOS ) {
-            SetInfoCVar(val, W_INT_POS);
+            JSON_SetInfoCVar(val, W_INT_POS);
         }
         else {
-            SetInfoCVar(val, W_INT);
+            JSON_SetInfoCVar(val, W_INT);
 	      }
 
         for ( i = 0; i < siz/INTEGER_UNIT_SIZE; i++ ) {
 #if INTEGER_UNIT_SIZE == 2
-	    //Emit( "C_SET_LIMB2( %c, %d, %d);\n",val, i, ((UInt2 *)((UInt *)ADDR_EXPR(expr) + 1))[i]);
+	    //JSON_Emit( "C_SET_LIMB2( %c, %d, %d);\n",val, i, ((UInt2 *)((UInt *)ADDR_EXPR(expr) + 1))[i]);
 #else
 #if INTEGER_UNIT_SIZE == 4
-	    //Emit( "C_SET_LIMB4( %c, %d, %dL);\n",val, i, ((UInt4 *)((UInt *)ADDR_EXPR(expr) + 1))[i]);
+	    //JSON_Emit( "C_SET_LIMB4( %c, %d, %dL);\n",val, i, ((UInt4 *)((UInt *)ADDR_EXPR(expr) + 1))[i]);
 #else
-	    //Emit( "C_SET_LIMB8( %c, %d, %dLL);\n",val, i, ((UInt8*)((UInt *)ADDR_EXPR(expr) + 1))[i]);
+	    //JSON_Emit( "C_SET_LIMB8( %c, %d, %dLL);\n",val, i, ((UInt8*)((UInt *)ADDR_EXPR(expr) + 1))[i]);
 #endif
 #endif
         }
 //	if (siz <= 8)
-	  //Emit("%c = C_NORMALIZE_64BIT(%c);\n", val,val);
+	  //JSON_Emit("%c = C_NORMALIZE_64BIT(%c);\n", val,val);
         return val;
     }
 }
@@ -2561,22 +2560,22 @@ CVar CompIntExpr (
 
 /****************************************************************************
 **
-*F  CompTrueExpr( <expr> )  . . . . . . . . . . . . . . . . . . . T_TRUE_EXPR
+*F  JSON_CompTrueExpr( <expr> )  . . . . . . . . . . . . . . . . . . . T_TRUE_EXPR
 */
-CVar CompTrueExpr (
+CVar JSON_CompTrueExpr (
     Expr                expr )
 {
     CVar                val;            /* value, result                   */
 
     /* allocate a new temporary for the 'true' value                       */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
     /* emit the code                                                       */
-    //Emit( "%c = True;\n", val );
-    Emit("\"true\"");
+    //JSON_Emit( "%c = True;\n", val );
+    JSON_Emit("\"true\"");
 
     /* we know that the result is boolean ;-)                              */
-    SetInfoCVar( val, W_BOOL );
+    JSON_SetInfoCVar( val, W_BOOL );
 
     /* return 'true'                                                       */
     return val;
@@ -2585,22 +2584,22 @@ CVar CompTrueExpr (
 
 /****************************************************************************
 **
-*F  CompFalseExpr( <expr> ) . . . . . . . . . . . . . . . . . .  T_FALSE_EXPR
+*F  JSON_CompFalseExpr( <expr> ) . . . . . . . . . . . . . . . . . .  T_FALSE_EXPR
 */
-CVar CompFalseExpr (
+CVar JSON_CompFalseExpr (
     Expr                expr )
 {
     CVar                val;            /* value, result                   */
 
     /* allocate a new temporary for the 'false' value                      */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
     /* emit the code                                                       */
-    //Emit( "%c = False;\n", val );
-    Emit("\"false\"");
+    //JSON_Emit( "%c = False;\n", val );
+    JSON_Emit("\"false\"");
 
     /* we know that the result is boolean ;-)                              */
-    SetInfoCVar( val, W_BOOL );
+    JSON_SetInfoCVar( val, W_BOOL );
 
     /* return 'false'                                                      */
     return val;
@@ -2609,25 +2608,25 @@ CVar CompFalseExpr (
 
 /****************************************************************************
 **
-*F  CompCharExpr( <expr> )  . . . . . . . . . . . . . . . . . . . T_CHAR_EXPR
+*F  JSON_CompCharExpr( <expr> )  . . . . . . . . . . . . . . . . . . . T_CHAR_EXPR
 */
-CVar            CompCharExpr (
+CVar            JSON_CompCharExpr (
     Expr                expr )
 {
     CVar                val;            /* result                          */
 
     /* allocate a new temporary for the char value                         */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"character\", \"val\":");
+    JSON_Emit("{\"type\":\"character\", \"val\":");
 
     /* emit the code                                                       */
-    //Emit( "%c = ObjsChar[%d];\n", val, (Int)(((UChar*)ADDR_EXPR(expr))[0]));
+    //JSON_Emit( "%c = ObjsChar[%d];\n", val, (Int)(((UChar*)ADDR_EXPR(expr))[0]));
 
-    Emit("\"%d\"}", (Int)(((UChar*)ADDR_EXPR(expr))[0]));
+    JSON_Emit("\"%d\"}", (Int)(((UChar*)ADDR_EXPR(expr))[0]));
 
     /* we know that we have a value                                        */
-    SetInfoCVar( val, W_BOUND );
+    JSON_SetInfoCVar( val, W_BOUND );
 
     /* return the value                                                    */
     return val;
@@ -2636,9 +2635,9 @@ CVar            CompCharExpr (
 
 /****************************************************************************
 **
-*F  CompPermExpr( <expr> )  . . . . . . . . . . . . . . . . . . . T_PERM_EXPR
+*F  JSON_CompPermExpr( <expr> )  . . . . . . . . . . . . . . . . . . . T_PERM_EXPR
 */
-CVar CompPermExpr (
+CVar JSON_CompPermExpr (
     Expr                expr )
 {
     CVar                perm;           /* result                          */
@@ -2651,61 +2650,61 @@ CVar CompPermExpr (
     Int                 csize;
     Expr                cycle;
 
-    Emit("{ \"type\":\"permutation\", \"components\":[");
+    JSON_Emit("{ \"type\":\"permutation\", \"components\":[");
 
     /* check for the identity                                              */
     if ( SIZE_EXPR(expr) == 0 ) {
-        perm = CVAR_TEMP( NewTemp( "idperm" ) );
-        //Emit( "%c = IdentityPerm;\n", perm );
-        SetInfoCVar( perm, W_BOUND );
-        Emit("]}");
+        perm = CVAR_TEMP( JSON_NewTemp( "idperm" ) );
+        //JSON_Emit( "%c = IdentityPerm;\n", perm );
+        JSON_SetInfoCVar( perm, W_BOUND );
+        JSON_Emit("]}");
         return perm;
     }
 
     /* for each cycle create a list                                        */
-    perm = CVAR_TEMP( NewTemp( "perm" ) );
-    lcyc = CVAR_TEMP( NewTemp( "lcyc" ) );
-    lprm = CVAR_TEMP( NewTemp( "lprm" ) );
+    perm = CVAR_TEMP( JSON_NewTemp( "perm" ) );
+    lcyc = CVAR_TEMP( JSON_NewTemp( "lcyc" ) );
+    lprm = CVAR_TEMP( JSON_NewTemp( "lprm" ) );
 
     /* start with the identity permutation                                 */
-    //Emit( "%c = IdentityPerm;\n", perm );
+    //JSON_Emit( "%c = IdentityPerm;\n", perm );
 
     /* loop over the cycles                                                */
     n = SIZE_EXPR(expr)/sizeof(Expr);
-    //Emit( "%c = NEW_PLIST( T_PLIST, %d );\n", lprm, n );
-    //Emit( "SET_LEN_PLIST( %c, %d );\n", lprm, n );
+    //JSON_Emit( "%c = NEW_PLIST( T_PLIST, %d );\n", lprm, n );
+    //JSON_Emit( "SET_LEN_PLIST( %c, %d );\n", lprm, n );
 
     for ( i = 1;  i <= n;  i++ ) {
         cycle = ADDR_EXPR(expr)[i-1];
         csize = SIZE_EXPR(cycle)/sizeof(Expr);
-        //Emit( "%c = NEW_PLIST( T_PLIST, %d );\n", lcyc, csize );
-        //Emit( "SET_LEN_PLIST( %c, %d );\n", lcyc, csize );
-        //Emit( "SET_ELM_PLIST( %c, %d, %c );\n", lprm, i, lcyc );
-        //Emit( "CHANGED_BAG( %c );\n", lprm );
+        //JSON_Emit( "%c = NEW_PLIST( T_PLIST, %d );\n", lcyc, csize );
+        //JSON_Emit( "SET_LEN_PLIST( %c, %d );\n", lcyc, csize );
+        //JSON_Emit( "SET_ELM_PLIST( %c, %d, %c );\n", lprm, i, lcyc );
+        //JSON_Emit( "CHANGED_BAG( %c );\n", lprm );
 
-        Emit("[");
+        JSON_Emit("[");
         /* loop over the entries of the cycle                              */
         for ( j = 1;  j <= csize;  j++ ) {
-            val = CompExpr( ADDR_EXPR(cycle)[j-1] );
+            val = JSON_CompExpr( ADDR_EXPR(cycle)[j-1] );
             if(j != csize) {
-              Emit(",");
+              JSON_Emit(",");
             }
-            //Emit( "SET_ELM_PLIST( %c, %d, %c );\n", lcyc, j, val );
-            //Emit( "CHANGED_BAG( %c );\n", lcyc );
-            if ( IS_TEMP_CVAR(val) )  FreeTemp( TEMP_CVAR(val) );
+            //JSON_Emit( "SET_ELM_PLIST( %c, %d, %c );\n", lcyc, j, val );
+            //JSON_Emit( "CHANGED_BAG( %c );\n", lcyc );
+            if ( IS_TEMP_CVAR(val) )  JSON_FreeTemp( TEMP_CVAR(val) );
         }
-        Emit("]");
+        JSON_Emit("]");
         if(i != n) {
-          Emit(", ");
+          JSON_Emit(", ");
         }
     }
-    //Emit( "%c = Array2Perm( %c );\n", perm, lprm );
+    //JSON_Emit( "%c = Array2Perm( %c );\n", perm, lprm );
 
     /* free the termporaries                                               */
-    FreeTemp( TEMP_CVAR(lprm) );
-    FreeTemp( TEMP_CVAR(lcyc) );
+    JSON_FreeTemp( TEMP_CVAR(lprm) );
+    JSON_FreeTemp( TEMP_CVAR(lcyc) );
 
-    Emit("]}");
+    JSON_Emit("]}");
 
     return perm;
 }
@@ -2713,21 +2712,21 @@ CVar CompPermExpr (
 
 /****************************************************************************
 **
-*F  CompListExpr( <expr> )  . . . . . . . . . . . . . . . . . . . T_LIST_EXPR
+*F  JSON_CompListExpr( <expr> )  . . . . . . . . . . . . . . . . . . . T_LIST_EXPR
 */
-extern CVar CompListExpr1 ( Expr expr );
-extern void CompListExpr2 ( CVar list, Expr expr );
-extern CVar CompRecExpr1 ( Expr expr );
-extern void CompRecExpr2 ( CVar rec, Expr expr );
+extern CVar JSON_CompListExpr1 ( Expr expr );
+extern void JSON_CompListExpr2 ( CVar list, Expr expr );
+extern CVar JSON_CompRecExpr1 ( Expr expr );
+extern void JSON_CompRecExpr2 ( CVar rec, Expr expr );
 
-CVar CompListExpr (
+CVar JSON_CompListExpr (
     Expr                expr )
 {
     CVar                list;           /* list, result                    */
 
     /* compile the list expression                                         */
-    list = CompListExpr1( expr );
-    CompListExpr2( list, expr );
+    list = JSON_CompListExpr1( expr );
+    JSON_CompListExpr2( list, expr );
 
     /* return the result                                                   */
     return list;
@@ -2736,34 +2735,34 @@ CVar CompListExpr (
 
 /****************************************************************************
 **
-*F  CompListTildeExpr( <expr> ) . . . . . . . . . . . . . .  T_LIST_TILD_EXPR
+*F  JSON_CompListTildeExpr( <expr> ) . . . . . . . . . . . . . .  T_LIST_TILD_EXPR
 */
-CVar CompListTildeExpr (
+CVar JSON_CompListTildeExpr (
     Expr                expr )
 {
     CVar                list;           /* list value, result              */
     CVar                tilde;          /* old value of tilde              */
 
-    Emit("{ \"type\":\"ListTilde\", \"list\":");
+    JSON_Emit("{ \"type\":\"ListTilde\", \"list\":");
 
     /* remember the old value of '~'                                       */
-    tilde = CVAR_TEMP( NewTemp( "tilde" ) );
-    //Emit( "%c = VAL_GVAR( Tilde );\n", tilde );
+    tilde = CVAR_TEMP( JSON_NewTemp( "tilde" ) );
+    //JSON_Emit( "%c = VAL_GVAR( Tilde );\n", tilde );
 
     /* create the list value                                               */
-    list = CompListExpr1( expr );
+    list = JSON_CompListExpr1( expr );
 
     /* assign the list to '~'                                              */
-    //Emit( "AssGVar( Tilde, %c );\n", list );
+    //JSON_Emit( "AssGVar( Tilde, %c );\n", list );
 
     /* evaluate the subexpressions into the list value                     */
-    CompListExpr2( list, expr );
+    JSON_CompListExpr2( list, expr );
 
     /* restore old value of '~'                                            */
-    //Emit( "AssGVar( Tilde, %c );\n", tilde );
-    if ( IS_TEMP_CVAR( tilde ) )  FreeTemp( TEMP_CVAR( tilde ) );
+    //JSON_Emit( "AssGVar( Tilde, %c );\n", tilde );
+    if ( IS_TEMP_CVAR( tilde ) )  JSON_FreeTemp( TEMP_CVAR( tilde ) );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* return the list value                                               */
     return list;
@@ -2772,11 +2771,11 @@ CVar CompListTildeExpr (
 
 /****************************************************************************
 **
-*F  CompListExpr1( <expr> ) . . . . . . . . . . . . . . . . . . . . . . local
+*F  JSON_CompListExpr1( <expr> ) . . . . . . . . . . . . . . . . . . . . . . local
 *
 * Create list.
 */
-CVar CompListExpr1 (
+CVar JSON_CompListExpr1 (
     Expr                expr )
 {
     CVar                list;           /* list, result                    */
@@ -2786,14 +2785,14 @@ CVar CompListExpr1 (
     len = SIZE_EXPR( expr ) / sizeof(Expr);
 
     /* allocate a temporary for the list                                   */
-    list = CVAR_TEMP( NewTemp( "list" ) );
+    list = CVAR_TEMP( JSON_NewTemp( "list" ) );
 
     /* emit the code to make the list                                      */
-    //Emit( "%c = NEW_PLIST( T_PLIST, %d );\n", list, len );
-    //Emit( "SET_LEN_PLIST( %c, %d );\n", list, len );
+    //JSON_Emit( "%c = NEW_PLIST( T_PLIST, %d );\n", list, len );
+    //JSON_Emit( "SET_LEN_PLIST( %c, %d );\n", list, len );
 
     /* we know that <list> is a list                                       */
-    SetInfoCVar( list, W_LIST );
+    JSON_SetInfoCVar( list, W_LIST );
 
     /* return the list                                                     */
     return list;
@@ -2802,11 +2801,11 @@ CVar CompListExpr1 (
 
 /****************************************************************************
 **
-*F  CompListExpr2( <list>, <expr> ) . . . . . . . . . . . . . . . . . . local
+*F  JSON_CompListExpr2( <list>, <expr> ) . . . . . . . . . . . . . . . . . . local
 *
 * Fill list.
 */
-void CompListExpr2 (
+void JSON_CompListExpr2 (
     CVar                list,
     Expr                expr )
 {
@@ -2814,7 +2813,7 @@ void CompListExpr2 (
     Int                 len;            /* logical length of the list      */
     Int                 i;              /* loop variable                   */
 
-    Emit("[");
+    JSON_Emit("[");
     /* get the length of the list                                          */
     len = SIZE_EXPR( expr ) / sizeof(Expr);
 
@@ -2828,48 +2827,48 @@ void CompListExpr2 (
 
         /* special case if subexpression is a list expression              */
         else if ( TNUM_EXPR( ADDR_EXPR(expr)[i-1] ) == T_LIST_EXPR ) {
-            sub = CompListExpr1( ADDR_EXPR(expr)[i-1] );
-            //Emit( "SET_ELM_PLIST( %c, %d, %c );\n", list, i, sub );
-            //Emit( "CHANGED_BAG( %c );\n", list );
-            CompListExpr2( sub, ADDR_EXPR(expr)[i-1] );
-            if ( IS_TEMP_CVAR( sub ) )  FreeTemp( TEMP_CVAR( sub ) );
+            sub = JSON_CompListExpr1( ADDR_EXPR(expr)[i-1] );
+            //JSON_Emit( "SET_ELM_PLIST( %c, %d, %c );\n", list, i, sub );
+            //JSON_Emit( "CHANGED_BAG( %c );\n", list );
+            JSON_CompListExpr2( sub, ADDR_EXPR(expr)[i-1] );
+            if ( IS_TEMP_CVAR( sub ) )  JSON_FreeTemp( TEMP_CVAR( sub ) );
         }
 
         /* special case if subexpression is a record expression            */
         else if ( TNUM_EXPR( ADDR_EXPR(expr)[i-1] ) == T_REC_EXPR ) {
-            sub = CompRecExpr1( ADDR_EXPR(expr)[i-1] );
-            //Emit( "SET_ELM_PLIST( %c, %d, %c );\n", list, i, sub );
-            //Emit( "CHANGED_BAG( %c );\n", list );
-            CompRecExpr2( sub, ADDR_EXPR(expr)[i-1] );
-            if ( IS_TEMP_CVAR( sub ) )  FreeTemp( TEMP_CVAR( sub ) );
+            sub = JSON_CompRecExpr1( ADDR_EXPR(expr)[i-1] );
+            //JSON_Emit( "SET_ELM_PLIST( %c, %d, %c );\n", list, i, sub );
+            //JSON_Emit( "CHANGED_BAG( %c );\n", list );
+            JSON_CompRecExpr2( sub, ADDR_EXPR(expr)[i-1] );
+            if ( IS_TEMP_CVAR( sub ) )  JSON_FreeTemp( TEMP_CVAR( sub ) );
         }
 
         /* general case                                                    */
         else {
-            sub = CompExpr( ADDR_EXPR(expr)[i-1] );
-            //Emit( "SET_ELM_PLIST( %c, %d, %c );\n", list, i, sub );
-            if ( ! HasInfoCVar( sub, W_INT_SMALL ) ) {
-                //Emit( "CHANGED_BAG( %c );\n", list );
+            sub = JSON_CompExpr( ADDR_EXPR(expr)[i-1] );
+            //JSON_Emit( "SET_ELM_PLIST( %c, %d, %c );\n", list, i, sub );
+            if ( ! JSON_HasInfoCVar( sub, W_INT_SMALL ) ) {
+                //JSON_Emit( "CHANGED_BAG( %c );\n", list );
             }
-            if ( IS_TEMP_CVAR( sub ) )  FreeTemp( TEMP_CVAR( sub ) );
+            if ( IS_TEMP_CVAR( sub ) )  JSON_FreeTemp( TEMP_CVAR( sub ) );
         }
 
         // if this is not last element
         if(i != len) {
-          Emit(", ");
+          JSON_Emit(", ");
         }
 
     }
-    Emit("]");
+    JSON_Emit("]");
 
 }
 
 
 /****************************************************************************
 **
-*F  CompRangeExpr( <expr> ) . . . . . . . . . . . . . . . . . .  T_RANGE_EXPR
+*F  JSON_CompRangeExpr( <expr> ) . . . . . . . . . . . . . . . . . .  T_RANGE_EXPR
 */
-CVar CompRangeExpr (
+CVar JSON_CompRangeExpr (
     Expr                expr )
 {
     CVar                range;          /* range, result                   */
@@ -2878,41 +2877,41 @@ CVar CompRangeExpr (
     CVar                last;           /* last   element                  */
 
     /* allocate a new temporary for the range                              */
-    range = CVAR_TEMP( NewTemp( "range" ) );
+    range = CVAR_TEMP( JSON_NewTemp( "range" ) );
 
-    Emit("{ \"type\":\"range\", ");
+    JSON_Emit("{ \"type\":\"range\", ");
 
     /* evaluate the expressions                                            */
     if ( SIZE_EXPR(expr) == 2 * sizeof(Expr) ) {
-        Emit("\"first\":");
-        first  = CompExpr( ADDR_EXPR(expr)[0] );
+        JSON_Emit("\"first\":");
+        first  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
         second = 0;
-        Emit(", \"last\":");
-        last   = CompExpr( ADDR_EXPR(expr)[1] );
+        JSON_Emit(", \"last\":");
+        last   = JSON_CompExpr( ADDR_EXPR(expr)[1] );
     }
     else {
-        Emit("\"first\":");
-        first  = CompExpr( ADDR_EXPR(expr)[0] );
-        Emit(", \"second\":");
-        second = CompExpr( ADDR_EXPR(expr)[1] );
-        Emit(", \"last\":");
-        last   = CompExpr( ADDR_EXPR(expr)[2] );
+        JSON_Emit("\"first\":");
+        first  = JSON_CompExpr( ADDR_EXPR(expr)[0] );
+        JSON_Emit(", \"second\":");
+        second = JSON_CompExpr( ADDR_EXPR(expr)[1] );
+        JSON_Emit(", \"last\":");
+        last   = JSON_CompExpr( ADDR_EXPR(expr)[2] );
     }
     
-    Emit("}");
+    JSON_Emit("}");
 
     /* we know that the result is a list                                   */
-    SetInfoCVar( range, W_LIST );
+    JSON_SetInfoCVar( range, W_LIST );
 
     /* free the temporaries                                                */
     if ( SIZE_EXPR(expr) == 2 * sizeof(Expr) ) {
-        if ( IS_TEMP_CVAR( last   ) )  FreeTemp( TEMP_CVAR( last   ) );
-        if ( IS_TEMP_CVAR( first  ) )  FreeTemp( TEMP_CVAR( first  ) );
+        if ( IS_TEMP_CVAR( last   ) )  JSON_FreeTemp( TEMP_CVAR( last   ) );
+        if ( IS_TEMP_CVAR( first  ) )  JSON_FreeTemp( TEMP_CVAR( first  ) );
     }
     else {
-        if ( IS_TEMP_CVAR( last   ) )  FreeTemp( TEMP_CVAR( last   ) );
-        if ( IS_TEMP_CVAR( second ) )  FreeTemp( TEMP_CVAR( second ) );
-        if ( IS_TEMP_CVAR( first  ) )  FreeTemp( TEMP_CVAR( first  ) );
+        if ( IS_TEMP_CVAR( last   ) )  JSON_FreeTemp( TEMP_CVAR( last   ) );
+        if ( IS_TEMP_CVAR( second ) )  JSON_FreeTemp( TEMP_CVAR( second ) );
+        if ( IS_TEMP_CVAR( first  ) )  JSON_FreeTemp( TEMP_CVAR( first  ) );
     }
 
     /* return the range                                                    */
@@ -2922,23 +2921,23 @@ CVar CompRangeExpr (
 
 /****************************************************************************
 **
-*F  CompStringExpr( <expr> )  . . . . . . . . . . compile a string expression
+*F  JSON_CompStringExpr( <expr> )  . . . . . . . . . . compile a string expression
 */
-CVar CompStringExpr (
+CVar JSON_CompStringExpr (
     Expr                expr )
 {
     CVar                string;         /* string value, result            */
 
     /* allocate a new temporary for the string                             */
-    string = CVAR_TEMP( NewTemp( "string" ) );
+    string = CVAR_TEMP( JSON_NewTemp( "string" ) );
 
     //TODO:
-//    Emit("\"%S\"", (sizeof(UInt) + (Char*)ADDR_EXPR(expr)));
-    Emit("\"%S\"", (Char*)ADDR_EXPR(expr));
+//    JSON_Emit("\"%S\"", (sizeof(UInt) + (Char*)ADDR_EXPR(expr)));
+    JSON_Emit("\"%S\"", (Char*)ADDR_EXPR(expr));
 //    Pr( "%C", (Int)(sizeof(UInt) + (Char*)ADDR_EXPR(expr)), 0L);
 
     /* create the string and copy the stuff                                */
-    //Emit( "C_NEW_STRING( %c, %d, \"%C\" );\n",
+    //JSON_Emit( "C_NEW_STRING( %c, %d, \"%C\" );\n",
 
           /* the sizeof(UInt) offset is to get past the length of the string
              which is now stored in the front of the literal */
@@ -2946,7 +2945,7 @@ CVar CompStringExpr (
 //          sizeof(UInt)+ (Char*)ADDR_EXPR(expr) );
 
     /* we know that the result is a list                                   */
-    SetInfoCVar( string, W_LIST );
+    JSON_SetInfoCVar( string, W_LIST );
 
     /* return the string                                                   */
     return string;
@@ -2955,16 +2954,16 @@ CVar CompStringExpr (
 
 /****************************************************************************
 **
-*F  CompRecExpr( <expr> ) . . . . . . . . . . . . . . . . . . . .  T_REC_EXPR
+*F  JSON_CompRecExpr( <expr> ) . . . . . . . . . . . . . . . . . . . .  T_REC_EXPR
 */
-CVar CompRecExpr (
+CVar JSON_CompRecExpr (
     Expr                expr )
 {
     CVar                rec;            /* record value, result            */
 
     /* compile the record expression                                       */
-    rec = CompRecExpr1( expr );
-    CompRecExpr2( rec, expr );
+    rec = JSON_CompRecExpr1( expr );
+    JSON_CompRecExpr2( rec, expr );
 
     /* return the result                                                   */
     return rec;
@@ -2973,34 +2972,34 @@ CVar CompRecExpr (
 
 /****************************************************************************
 **
-*F  CompRecTildeExpr( <expr> )  . . . . . . . . . . . . . . . T_REC_TILD_EXPR
+*F  JSON_CompRecTildeExpr( <expr> )  . . . . . . . . . . . . . . . T_REC_TILD_EXPR
 */
-CVar CompRecTildeExpr (
+CVar JSON_CompRecTildeExpr (
     Expr                expr )
 {
     CVar                rec;            /* record value, result            */
     CVar                tilde;          /* old value of tilde              */
 
-    Emit("{ \"type\":\"RecordTilde\", \"record\":");
+    JSON_Emit("{ \"type\":\"RecordTilde\", \"record\":");
 
     /* remember the old value of '~'                                       */
-    tilde = CVAR_TEMP( NewTemp( "tilde" ) );
-    //Emit( "%c = VAL_GVAR( Tilde );\n", tilde );
+    tilde = CVAR_TEMP( JSON_NewTemp( "tilde" ) );
+    //JSON_Emit( "%c = VAL_GVAR( Tilde );\n", tilde );
 
     /* create the record value                                             */
-    rec = CompRecExpr1( expr );
+    rec = JSON_CompRecExpr1( expr );
 
     /* assign the record value to the variable '~'                         */
-    //Emit( "AssGVar( Tilde, %c );\n", rec );
+    //JSON_Emit( "AssGVar( Tilde, %c );\n", rec );
 
     /* evaluate the subexpressions into the record value                   */
-    CompRecExpr2( rec, expr );
+    JSON_CompRecExpr2( rec, expr );
 
     /* restore the old value of '~'                                        */
-    //Emit( "AssGVar( Tilde, %c );\n", tilde );
-    if ( IS_TEMP_CVAR( tilde ) )  FreeTemp( TEMP_CVAR( tilde ) );
+    //JSON_Emit( "AssGVar( Tilde, %c );\n", tilde );
+    if ( IS_TEMP_CVAR( tilde ) )  JSON_FreeTemp( TEMP_CVAR( tilde ) );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* return the record value                                             */
     return rec;
@@ -3009,11 +3008,11 @@ CVar CompRecTildeExpr (
 
 /****************************************************************************
 **
-*F  CompRecExpr1( <expr> )  . . . . . . . . . . . . . . . . . . . . . . local
+*F  JSON_CompRecExpr1( <expr> )  . . . . . . . . . . . . . . . . . . . . . . local
 *
 *   Allocate the record.
 */
-CVar CompRecExpr1 (
+CVar JSON_CompRecExpr1 (
     Expr                expr )
 {
     CVar                rec;            /* record value, result            */
@@ -3023,13 +3022,13 @@ CVar CompRecExpr1 (
     len = SIZE_EXPR( expr ) / (2*sizeof(Expr));
 
     /* allocate a new temporary for the record                             */
-    rec = CVAR_TEMP( NewTemp( "rec" ) );
+    rec = CVAR_TEMP( JSON_NewTemp( "rec" ) );
 
     /* emit the code to allocate the new record object                     */
-    //Emit( "%c = NEW_PREC( %d );\n", rec, len );
+    //JSON_Emit( "%c = NEW_PREC( %d );\n", rec, len );
 
     /* we know that we have a value                                        */
-    SetInfoCVar( rec, W_BOUND );
+    JSON_SetInfoCVar( rec, W_BOUND );
 
     /* return the record                                                   */
     return rec;
@@ -3038,11 +3037,11 @@ CVar CompRecExpr1 (
 
 /****************************************************************************
 **
-*F  CompRecExpr2( <rec>, <expr> ) . . . . . . . . . . . . . . . . . . . local
+*F  JSON_CompRecExpr2( <rec>, <expr> ) . . . . . . . . . . . . . . . . . . . local
 *
 *   Assign values to already allocated record.
 */
-void            CompRecExpr2 (
+void            JSON_CompRecExpr2 (
     CVar                rec,
     Expr                expr )
 {
@@ -3055,74 +3054,74 @@ void            CompRecExpr2 (
     /* get the number of components                                        */
     len = SIZE_EXPR( expr ) / (2*sizeof(Expr));
 
-    Emit("{ \"type\":\"record\", \"components\":{");
+    JSON_Emit("{ \"type\":\"record\", \"components\":{");
 
     /* handle the subexpressions                                           */
     for ( i = 1; i <= len; i++ ) {
 
         /* handle the name                                                 */
         tmp = ADDR_EXPR(expr)[2*i-2];
-        rnam = CVAR_TEMP( NewTemp( "rnam" ) );
+        rnam = CVAR_TEMP( JSON_NewTemp( "rnam" ) );
         if ( IS_INTEXPR(tmp) ) {
-            Emit("\"%s\"", NAME_RNAM((UInt)INT_INTEXPR(tmp)));
-            CompSetUseRNam( (UInt)INT_INTEXPR(tmp), COMP_USE_RNAM_ID );
-           // Emit( "%c = (Obj)R_%n;\n",
+            JSON_Emit("\"%s\"", NAME_RNAM((UInt)INT_INTEXPR(tmp)));
+            JSON_CompSetUseRNam( (UInt)INT_INTEXPR(tmp), COMP_USE_RNAM_ID );
+           // JSON_Emit( "%c = (Obj)R_%n;\n",
            //       rnam, NAME_RNAM((UInt)INT_INTEXPR(tmp)) );
         }
         else {
-            sub = CompExpr( tmp );
-//            Emit( "%c = (Obj)RNamObj( %c );\n", rnam, sub );
+            sub = JSON_CompExpr( tmp );
+//            JSON_Emit( "%c = (Obj)RNamObj( %c );\n", rnam, sub );
         }
 
-        Emit(":");
+        JSON_Emit(":");
 
         /* if the subexpression is empty (cannot happen for records)       */
         tmp = ADDR_EXPR(expr)[2*i-1];
         if ( tmp == 0 ) {
-            if ( IS_TEMP_CVAR( rnam ) )  FreeTemp( TEMP_CVAR( rnam ) );
+            if ( IS_TEMP_CVAR( rnam ) )  JSON_FreeTemp( TEMP_CVAR( rnam ) );
             continue;
         }
 
         /* special case if subexpression is a list expression             */
         else if ( TNUM_EXPR( tmp ) == T_LIST_EXPR ) {
-            sub = CompListExpr1( tmp );
-            //Emit( "AssPRec( %c, (UInt)%c, %c );\n", rec, rnam, sub );
-            CompListExpr2( sub, tmp );
-            if ( IS_TEMP_CVAR( sub ) )  FreeTemp( TEMP_CVAR( sub ) );
+            sub = JSON_CompListExpr1( tmp );
+            //JSON_Emit( "AssPRec( %c, (UInt)%c, %c );\n", rec, rnam, sub );
+            JSON_CompListExpr2( sub, tmp );
+            if ( IS_TEMP_CVAR( sub ) )  JSON_FreeTemp( TEMP_CVAR( sub ) );
         }
 
         /* special case if subexpression is a record expression            */
         else if ( TNUM_EXPR( tmp ) == T_REC_EXPR ) {
-            sub = CompRecExpr1( tmp );
-            //Emit( "AssPRec( %c, (UInt)%c, %c );\n", rec, rnam, sub );
-            CompRecExpr2( sub, tmp );
-            if ( IS_TEMP_CVAR( sub ) )  FreeTemp( TEMP_CVAR( sub ) );
+            sub = JSON_CompRecExpr1( tmp );
+            //JSON_Emit( "AssPRec( %c, (UInt)%c, %c );\n", rec, rnam, sub );
+            JSON_CompRecExpr2( sub, tmp );
+            if ( IS_TEMP_CVAR( sub ) )  JSON_FreeTemp( TEMP_CVAR( sub ) );
         }
 
         /* general case                                                    */
         else {
-            sub = CompExpr( tmp );
-            //Emit( "AssPRec( %c, (UInt)%c, %c );\n", rec, rnam, sub );
-            if ( IS_TEMP_CVAR( sub ) )  FreeTemp( TEMP_CVAR( sub ) );
+            sub = JSON_CompExpr( tmp );
+            //JSON_Emit( "AssPRec( %c, (UInt)%c, %c );\n", rec, rnam, sub );
+            if ( IS_TEMP_CVAR( sub ) )  JSON_FreeTemp( TEMP_CVAR( sub ) );
         }
 
-        if ( IS_TEMP_CVAR( rnam ) )  FreeTemp( TEMP_CVAR( rnam ) );
+        if ( IS_TEMP_CVAR( rnam ) )  JSON_FreeTemp( TEMP_CVAR( rnam ) );
 
         if( i < len ) {
-          Emit(", ");
+          JSON_Emit(", ");
         }
     }
-    //Emit( "SortPRecRNam( %c, 0 );\n", rec );
+    //JSON_Emit( "SortPRecRNam( %c, 0 );\n", rec );
 
-    Emit("}}");
+    JSON_Emit("}}");
 }
 
 
 /****************************************************************************
 **
-*F  CompRefLVar( <expr> ) . . . . . . .  T_REFLVAR/T_REF_LVAR...T_REF_LVAR_16
+*F  JSON_CompRefLVar( <expr> ) . . . . . . .  T_REFLVAR/T_REF_LVAR...T_REF_LVAR_16
 */
-CVar CompRefLVar (
+CVar JSON_CompRefLVar (
     Expr                expr )
 {
     CVar                val;            /* value, result                   */
@@ -3137,15 +3136,15 @@ CVar CompRefLVar (
     }
 
     /* emit the code to get the value                                      */
-    if ( CompGetUseHVar( lvar ) ) {
-        val = CVAR_TEMP( NewTemp( "val" ) );
+    if ( JSON_CompGetUseHVar( lvar ) ) {
+        val = CVAR_TEMP( JSON_NewTemp( "val" ) );
     }
     else {
         val = CVAR_LVAR(lvar);
     }
 
-    Emit("{\"type\":\"variable\", \"subtype\":\"RefLVar\"");
-    Emit(", \"identifier\":\"%s\"}", NAME_LVAR(lvar));
+    JSON_Emit("{\"type\":\"variable\", \"subtype\":\"RefLVar\"");
+    JSON_Emit(", \"identifier\":\"%s\"}", NAME_LVAR(lvar));
 
     /* return the value                                                    */
     return val;
@@ -3154,9 +3153,9 @@ CVar CompRefLVar (
 
 /****************************************************************************
 **
-*F  CompIsbLVar( <expr> ) . . . . . . . . . . . . . . . . . . . .  T_ISB_LVAR
+*F  JSON_CompIsbLVar( <expr> ) . . . . . . . . . . . . . . . . . . . .  T_ISB_LVAR
 */
-CVar CompIsbLVar (
+CVar JSON_CompIsbLVar (
     Expr                expr )
 {
     CVar                isb;            /* isbound, result                 */
@@ -3166,25 +3165,25 @@ CVar CompIsbLVar (
     /* get the local variable                                              */
     lvar = (LVar)(ADDR_EXPR(expr)[0]);
 
-    Emit("{\"type\":\"variable\", \"subtype\":\"isBoundLVar\"");
-    Emit(", \"identifier\":\"%s\"}", NAME_LVAR(lvar));
+    JSON_Emit("{\"type\":\"variable\", \"subtype\":\"isBoundLVar\"");
+    JSON_Emit(", \"identifier\":\"%s\"}", NAME_LVAR(lvar));
 
     /* allocate a new temporary for the result                             */
-    isb = CVAR_TEMP( NewTemp( "isb" ) );
+    isb = CVAR_TEMP( JSON_NewTemp( "isb" ) );
 
     /* emit the code to get the value                                      */
-    if ( CompGetUseHVar( lvar ) ) {
-        val = CVAR_TEMP( NewTemp( "val" ) );
+    if ( JSON_CompGetUseHVar( lvar ) ) {
+        val = CVAR_TEMP( JSON_NewTemp( "val" ) );
     }
     else {
         val = CVAR_LVAR(lvar);
     }
 
     /* we know that the result is boolean                                  */
-    SetInfoCVar( isb, W_BOOL );
+    JSON_SetInfoCVar( isb, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( val ) )  FreeTemp( TEMP_CVAR( val ) );
+    if ( IS_TEMP_CVAR( val ) )  JSON_FreeTemp( TEMP_CVAR( val ) );
 
     /* return the result                                                   */
     return isb;
@@ -3193,9 +3192,9 @@ CVar CompIsbLVar (
 
 /****************************************************************************
 **
-*F  CompRefHVar( <expr> ) . . . . . . . . . . . . . . . . . . . .  T_REF_HVAR
+*F  JSON_CompRefHVar( <expr> ) . . . . . . . . . . . . . . . . . . . .  T_REF_HVAR
 */
-CVar CompRefHVar (
+CVar JSON_CompRefHVar (
     Expr                expr )
 {
     CVar                val;            /* value, result                   */
@@ -3203,16 +3202,16 @@ CVar CompRefHVar (
 
     /* get the higher variable                                             */
     hvar = (HVar)(ADDR_EXPR(expr)[0]);
-    CompSetUseHVar( hvar );
+    JSON_CompSetUseHVar( hvar );
 
     /* allocate a new temporary for the value                              */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
     /* emit the code to check that the variable has a value                */
-    CompCheckBound( val, NAME_HVAR(hvar) );
+    JSON_CompCheckBound( val, NAME_HVAR(hvar) );
 
-    Emit("{\"type\":\"variable\", \"subtype\":\"RefHVar\"");
-    Emit(", \"identifier\":\"%s\"}", NAME_HVAR(hvar));
+    JSON_Emit("{\"type\":\"variable\", \"subtype\":\"RefHVar\"");
+    JSON_Emit(", \"identifier\":\"%s\"}", NAME_HVAR(hvar));
  
     /* return the value                                                    */
     return val;
@@ -3221,9 +3220,9 @@ CVar CompRefHVar (
 
 /****************************************************************************
 **
-*F  CompIsbHVar( <expr> ) . . . . . . . . . . . . . . . . . . . .  T_ISB_HVAR
+*F  JSON_CompIsbHVar( <expr> ) . . . . . . . . . . . . . . . . . . . .  T_ISB_HVAR
 */
-CVar CompIsbHVar (
+CVar JSON_CompIsbHVar (
     Expr                expr )
 {
     CVar                isb;            /* isbound, result                 */
@@ -3232,20 +3231,20 @@ CVar CompIsbHVar (
 
     /* get the higher variable                                             */
     hvar = (HVar)(ADDR_EXPR(expr)[0]);
-    CompSetUseHVar( hvar );
+    JSON_CompSetUseHVar( hvar );
 
     /* allocate new temporaries for the value and the result               */
-    val = CVAR_TEMP( NewTemp( "val" ) );
-    isb = CVAR_TEMP( NewTemp( "isb" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
+    isb = CVAR_TEMP( JSON_NewTemp( "isb" ) );
 
     /* we know that the result is boolean                                  */
-    SetInfoCVar( isb, W_BOOL );
+    JSON_SetInfoCVar( isb, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( val ) )  FreeTemp( TEMP_CVAR( val ) );
+    if ( IS_TEMP_CVAR( val ) )  JSON_FreeTemp( TEMP_CVAR( val ) );
 
-    Emit("{\"type\":\"variable\", \"subtype\":\"isBoundHVar\"");
-    Emit(", \"identifier\":\"%s\"}", NAME_HVAR(hvar));
+    JSON_Emit("{\"type\":\"variable\", \"subtype\":\"isBoundHVar\"");
+    JSON_Emit(", \"identifier\":\"%s\"}", NAME_HVAR(hvar));
 
     /* return the result                                                   */
     return isb;
@@ -3254,9 +3253,9 @@ CVar CompIsbHVar (
 
 /****************************************************************************
 **
-*F  CompRefGVar( <expr> ) . . . . . . . . . . . . . . . . . . . .  T_REF_GVAR
+*F  JSON_CompRefGVar( <expr> ) . . . . . . . . . . . . . . . . . . . .  T_REF_GVAR
 */
-CVar CompRefGVar (
+CVar JSON_CompRefGVar (
     Expr                expr )
 {
     CVar                val;            /* value, result                   */
@@ -3264,16 +3263,16 @@ CVar CompRefGVar (
 
     /* get the global variable                                             */
     gvar = (GVar)(ADDR_EXPR(expr)[0]);
-    CompSetUseGVar( gvar, COMP_USE_GVAR_COPY );
+    JSON_CompSetUseGVar( gvar, COMP_USE_GVAR_COPY );
 
     /* allocate a new global variable for the value                        */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"variable\", \"subtype\":\"RefGVar\"");
-    Emit( ", \"identifier\":\"%s\"}", NameGVar(gvar));
+    JSON_Emit("{\"type\":\"variable\", \"subtype\":\"RefGVar\"");
+    JSON_Emit( ", \"identifier\":\"%s\"}", NameGVar(gvar));
 
     /* emit the code to check that the variable has a value                */
-    CompCheckBound( val, NameGVar(gvar) );
+    JSON_CompCheckBound( val, NameGVar(gvar) );
 
     /* return the value                                                    */
     return val;
@@ -3282,9 +3281,9 @@ CVar CompRefGVar (
 
 /****************************************************************************
 **
-*F  CompRefGVarFopy( <expr> ) . . . . . . . . . . . . . . . . . . . . . local
+*F  JSON_CompRefGVarFopy( <expr> ) . . . . . . . . . . . . . . . . . . . . . local
 */
-CVar CompRefGVarFopy (
+CVar JSON_CompRefGVarFopy (
     Expr                expr )
 {
     CVar                val;            /* value, result                   */
@@ -3292,17 +3291,17 @@ CVar CompRefGVarFopy (
 
     /* get the global variable                                             */
     gvar = (GVar)(ADDR_EXPR(expr)[0]);
-    CompSetUseGVar( gvar, COMP_USE_GVAR_FOPY );
+    JSON_CompSetUseGVar( gvar, COMP_USE_GVAR_FOPY );
 
     /* allocate a new temporary for the value                              */
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
-    Emit("{\"type\":\"variable\", \"subtype\":\"RefGVarFopy\"");
+    JSON_Emit("{\"type\":\"variable\", \"subtype\":\"RefGVarFopy\"");
     /* emit name of the global variable                                    */
-    Emit(", \"identifier\":\"%s\"}", NameGVar(gvar));
+    JSON_Emit(", \"identifier\":\"%s\"}", NameGVar(gvar));
 
     /* we know that the object in a function copy is a function            */
-    SetInfoCVar( val, W_FUNC );
+    JSON_SetInfoCVar( val, W_FUNC );
 
     /* return the value                                                    */
     return val;
@@ -3311,9 +3310,9 @@ CVar CompRefGVarFopy (
 
 /****************************************************************************
 **
-*F  CompIsbGVar( <expr> ) . . . . . . . . . . . . . . . . . . . .  T_ISB_GVAR
+*F  JSON_CompIsbGVar( <expr> ) . . . . . . . . . . . . . . . . . . . .  T_ISB_GVAR
 */
-CVar CompIsbGVar (
+CVar JSON_CompIsbGVar (
     Expr                expr )
 {
     CVar                isb;            /* isbound, result                 */
@@ -3322,26 +3321,26 @@ CVar CompIsbGVar (
 
     /* get the global variable                                             */
     gvar = (GVar)(ADDR_EXPR(expr)[0]);
-    CompSetUseGVar( gvar, COMP_USE_GVAR_COPY );
+    JSON_CompSetUseGVar( gvar, COMP_USE_GVAR_COPY );
 
-    Emit("{\"type\":\"variable\", \"subtype\":\"isBoundGVar\"");
-    Emit( ", \"identifier\":\"%s\"}", NameGVar(gvar));
+    JSON_Emit("{\"type\":\"variable\", \"subtype\":\"isBoundGVar\"");
+    JSON_Emit( ", \"identifier\":\"%s\"}", NameGVar(gvar));
 
     /* allocate new temporaries for the value and the result               */
-    isb = CVAR_TEMP( NewTemp( "isb" ) );
-    val = CVAR_TEMP( NewTemp( "val" ) );
+    isb = CVAR_TEMP( JSON_NewTemp( "isb" ) );
+    val = CVAR_TEMP( JSON_NewTemp( "val" ) );
 
     /* emit the code to get the value                                      */
-    //Emit( "%c = GC_%n;\n", val, NameGVar(gvar) );
+    //JSON_Emit( "%c = GC_%n;\n", val, NameGVar(gvar) );
 
     /* emit the code to check that the variable has a value                */
-    //Emit( "%c = ((%c != 0) ? True : False);\n", isb, val );
+    //JSON_Emit( "%c = ((%c != 0) ? True : False);\n", isb, val );
 
     /* we know that the result is boolean                                  */
-    SetInfoCVar( isb, W_BOOL );
+    JSON_SetInfoCVar( isb, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( val ) )  FreeTemp( TEMP_CVAR( val ) );
+    if ( IS_TEMP_CVAR( val ) )  JSON_FreeTemp( TEMP_CVAR( val ) );
 
     /* return the result                                                   */
     return isb;
@@ -3350,36 +3349,36 @@ CVar CompIsbGVar (
 
 /****************************************************************************
 **
-*F  CompElmList( <expr> ) . . . . . . . . . . . . . . . . . . . .  T_ELM_LIST
+*F  JSON_CompElmList( <expr> ) . . . . . . . . . . . . . . . . . . . .  T_ELM_LIST
 */
-CVar CompElmList (
+CVar JSON_CompElmList (
     Expr                expr )
 {
     CVar                elm;            /* element, result                 */
     CVar                list;           /* list                            */
     CVar                pos;            /* position                        */
 
-    Emit( "{ \"type\":\"listAccess\", \"list\":");
+    JSON_Emit( "{ \"type\":\"listAccess\", \"list\":");
 
     /* allocate a new temporary for the element                            */
-    elm = CVAR_TEMP( NewTemp( "elm" ) );
+    elm = CVAR_TEMP( JSON_NewTemp( "elm" ) );
 
     /* compile the list expression (checking is done by 'ELM_LIST')        */
-    list = CompExpr( ADDR_EXPR(expr)[0] );
+    list = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit( ", \"position\":");
+    JSON_Emit( ", \"position\":");
 
     /* compile and check the position expression                           */
-    pos = CompExpr( ADDR_EXPR(expr)[1] );
+    pos = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit( "}" );
+    JSON_Emit( "}" );
 
     /* we know that we have a value                                        */
-    SetInfoCVar( elm, W_BOUND );
+    JSON_SetInfoCVar( elm, W_BOUND );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( pos  ) )  FreeTemp( TEMP_CVAR( pos  ) );
-    if ( IS_TEMP_CVAR( list ) )  FreeTemp( TEMP_CVAR( list ) );
+    if ( IS_TEMP_CVAR( pos  ) )  JSON_FreeTemp( TEMP_CVAR( pos  ) );
+    if ( IS_TEMP_CVAR( list ) )  JSON_FreeTemp( TEMP_CVAR( list ) );
 
     /* return the element                                                  */
     return elm;
@@ -3388,9 +3387,9 @@ CVar CompElmList (
 
 /****************************************************************************
 **
-*F  CompElmsList( <expr> )  . . . . . . . . . . . . . . . . . . . T_ELMS_LIST
+*F  JSON_CompElmsList( <expr> )  . . . . . . . . . . . . . . . . . . . T_ELMS_LIST
 */
-CVar CompElmsList (
+CVar JSON_CompElmsList (
     Expr                expr )
 {
     CVar                elms;           /* elements, result                */
@@ -3398,29 +3397,29 @@ CVar CompElmsList (
     CVar                poss;           /* positions                       */
 
     /* allocate a new temporary for the elements                           */
-    elms = CVAR_TEMP( NewTemp( "elms" ) );
+    elms = CVAR_TEMP( JSON_NewTemp( "elms" ) );
 
-    Emit("{ \"type\":\"elmslist\", \"list\":");
+    JSON_Emit("{ \"type\":\"elmslist\", \"list\":");
 
     /* compile the list expression (checking is done by 'ElmsListCheck')   */
-    list = CompExpr( ADDR_EXPR(expr)[0] );
+    list = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"pos\":");
+    JSON_Emit(", \"pos\":");
 
     /* compile the position expression (checking done by 'ElmsListCheck')  */
-    poss = CompExpr( ADDR_EXPR(expr)[1] );
+    poss = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code to get the element                                    */
-    //Emit( "%c = ElmsListCheck( %c, %c );\n", elms, list, poss );
+    //JSON_Emit( "%c = ElmsListCheck( %c, %c );\n", elms, list, poss );
 
     /* we know that the elements are a list                                */
-    SetInfoCVar( elms, W_LIST );
+    JSON_SetInfoCVar( elms, W_LIST );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( poss ) )  FreeTemp( TEMP_CVAR( poss ) );
-    if ( IS_TEMP_CVAR( list ) )  FreeTemp( TEMP_CVAR( list ) );
+    if ( IS_TEMP_CVAR( poss ) )  JSON_FreeTemp( TEMP_CVAR( poss ) );
+    if ( IS_TEMP_CVAR( list ) )  JSON_FreeTemp( TEMP_CVAR( list ) );
 
     /* return the elements                                                 */
     return elms;
@@ -3429,37 +3428,37 @@ CVar CompElmsList (
 
 /****************************************************************************
 **
-*F  CompElmListLev( <expr> )  . . . . . . . . . . . . . . . .  T_ELM_LIST_LEV
+*F  JSON_CompElmListLev( <expr> )  . . . . . . . . . . . . . . . .  T_ELM_LIST_LEV
 */
-CVar CompElmListLev (
+CVar JSON_CompElmListLev (
     Expr                expr )
 {
     CVar                lists;          /* lists                           */
     CVar                pos;            /* position                        */
     Int                 level;          /* level                           */
 
-    Emit("{ \"type\":\"elmListLev\", \"lists\":");
+    JSON_Emit("{ \"type\":\"elmListLev\", \"lists\":");
 
     /* compile the lists expression                                        */
-    lists = CompExpr( ADDR_EXPR(expr)[0] );
+    lists = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"pos\":");
+    JSON_Emit(", \"pos\":");
 
     /* compile and check the position expression                           */
-    pos = CompExpr( ADDR_EXPR(expr)[1] );
-    CompCheckIntSmallPos( pos );
+    pos = JSON_CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_CompCheckIntSmallPos( pos );
 
-    Emit(", \"level\":");
+    JSON_Emit(", \"level\":");
     /* get the level                                                       */
     level = (Int)(ADDR_EXPR(expr)[2]);
 
-    Emit("%d}", level);
+    JSON_Emit("%d}", level);
 
     /* emit the code to select the elements from several lists (to <lists>)*/
-    //Emit( "ElmListLevel( %c, %c, %d );\n", lists, pos, level );
+    //JSON_Emit( "ElmListLevel( %c, %c, %d );\n", lists, pos, level );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( pos   ) )  FreeTemp( TEMP_CVAR( pos   ) );
+    if ( IS_TEMP_CVAR( pos   ) )  JSON_FreeTemp( TEMP_CVAR( pos   ) );
 
     /* return the lists                                                    */
     return lists;
@@ -3468,37 +3467,37 @@ CVar CompElmListLev (
 
 /****************************************************************************
 **
-*F  CompElmsListLev( <expr> ) . . . . . . . . . . . . . . . . T_ELMS_LIST_LEV
+*F  JSON_CompElmsListLev( <expr> ) . . . . . . . . . . . . . . . . T_ELMS_LIST_LEV
 */
-CVar CompElmsListLev (
+CVar JSON_CompElmsListLev (
     Expr                expr )
 {
     CVar                lists;          /* lists                           */
     CVar                poss;           /* positions                       */
     Int                 level;          /* level                           */
 
-    Emit("{ \"type\":\"ElmsListLev\", \"list\":");
+    JSON_Emit("{ \"type\":\"ElmsListLev\", \"list\":");
 
     /* compile the lists expression                                        */
-    lists = CompExpr( ADDR_EXPR(expr)[0] );
+    lists = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"position\":");
+    JSON_Emit(", \"position\":");
 
     /* compile the position expression (checking done by 'ElmsListLevel')  */
-    poss = CompExpr( ADDR_EXPR(expr)[1] );
+    poss = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
     /* get the level                                                       */
     level = (Int)(ADDR_EXPR(expr)[2]);
 
-    Emit(", \"level\":%d", level);
+    JSON_Emit(", \"level\":%d", level);
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code to select the elements from several lists (to <lists>)*/
-    //Emit( "ElmsListLevelCheck( %c, %c, %d );\n", lists, poss, level );
+    //JSON_Emit( "ElmsListLevelCheck( %c, %c, %d );\n", lists, poss, level );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( poss  ) )  FreeTemp( TEMP_CVAR( poss  ) );
+    if ( IS_TEMP_CVAR( poss  ) )  JSON_FreeTemp( TEMP_CVAR( poss  ) );
 
     /* return the lists                                                    */
     return lists;
@@ -3507,39 +3506,39 @@ CVar CompElmsListLev (
 
 /****************************************************************************
 **
-*F  CompIsbList( <expr> ) . . . . . . . . . . . . . . . . . . . .  T_ISB_LIST
+*F  JSON_CompIsbList( <expr> ) . . . . . . . . . . . . . . . . . . . .  T_ISB_LIST
 */
-CVar CompIsbList (
+CVar JSON_CompIsbList (
     Expr                expr )
 {
     CVar                isb;            /* isbound, result                 */
     CVar                list;           /* list                            */
     CVar                pos;            /* position                        */
 
-    Emit("{ \"type\":\"CompIsbList\", \"list\":");
+    JSON_Emit("{ \"type\":\"JSON_CompIsbList\", \"list\":");
 
     /* allocate a new temporary for the result                             */
-    isb = CVAR_TEMP( NewTemp( "isb" ) );
+    isb = CVAR_TEMP( JSON_NewTemp( "isb" ) );
 
     /* compile the list expression (checking is done by 'ISB_LIST')        */
-    list = CompExpr( ADDR_EXPR(expr)[0] );
+    list = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"position\":");
+    JSON_Emit(", \"position\":");
 
     /* compile and check the position expression                           */
-    pos = CompExpr( ADDR_EXPR(expr)[1] );
+    pos = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code to test the element                                   */
-    //Emit( "%c = C_ISB_LIST( %c, %c );\n", isb, list, pos );
+    //JSON_Emit( "%c = C_ISB_LIST( %c, %c );\n", isb, list, pos );
 
     /* we know that the result is boolean                                  */
-    SetInfoCVar( isb, W_BOOL );
+    JSON_SetInfoCVar( isb, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( pos  ) )  FreeTemp( TEMP_CVAR( pos  ) );
-    if ( IS_TEMP_CVAR( list ) )  FreeTemp( TEMP_CVAR( list ) );
+    if ( IS_TEMP_CVAR( pos  ) )  JSON_FreeTemp( TEMP_CVAR( pos  ) );
+    if ( IS_TEMP_CVAR( list ) )  JSON_FreeTemp( TEMP_CVAR( list ) );
 
     /* return the element                                                  */
     return isb;
@@ -3548,40 +3547,40 @@ CVar CompIsbList (
 
 /****************************************************************************
 **
-*F  CompElmRecName( <expr> )  . . . . . . . . . . . . . . . .  T_ELM_REC_NAME
+*F  JSON_CompElmRecName( <expr> )  . . . . . . . . . . . . . . . .  T_ELM_REC_NAME
 */
-CVar CompElmRecName (
+CVar JSON_CompElmRecName (
     Expr                expr )
 {
     CVar                elm;            /* element, result                 */
     CVar                record;         /* the record, left operand        */
     UInt                rnam;           /* the name, right operand         */
 
-    Emit("{ \"type\":\"CompElmRecName\", \"record\":");
+    JSON_Emit("{ \"type\":\"JSON_CompElmRecName\", \"record\":");
 
     /* allocate a new temporary for the element                            */
-    elm = CVAR_TEMP( NewTemp( "elm" ) );
+    elm = CVAR_TEMP( JSON_NewTemp( "elm" ) );
 
     /* compile the record expression (checking is done by 'ELM_REC')       */
-    record = CompExpr( ADDR_EXPR(expr)[0] );
+    record = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"name\":");
+    JSON_Emit(", \"name\":");
 
     /* get the name (stored immediately in the expression)                 */
     rnam = (UInt)(ADDR_EXPR(expr)[1]);
-    Emit("\"%s\"", NAME_RNAM(rnam));
-    CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
+    JSON_Emit("\"%s\"", NAME_RNAM(rnam));
+    JSON_CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
     /* emit the code to select the element of the record                   */
-    //Emit( "%c = ELM_REC( %c, R_%n );\n", elm, record, NAME_RNAM(rnam) );
+    //JSON_Emit( "%c = ELM_REC( %c, R_%n );\n", elm, record, NAME_RNAM(rnam) );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* we know that we have a value                                        */
-    SetInfoCVar( elm, W_BOUND );
+    JSON_SetInfoCVar( elm, W_BOUND );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( record ) )  FreeTemp( TEMP_CVAR( record ) );
+    if ( IS_TEMP_CVAR( record ) )  JSON_FreeTemp( TEMP_CVAR( record ) );
 
     /* return the element                                                  */
     return elm;
@@ -3590,39 +3589,39 @@ CVar CompElmRecName (
 
 /****************************************************************************
 **
-*F  CompElmRecExpr( <expr> )  . . . . . . . . . . . . . . . .  T_ELM_REC_EXPR
+*F  JSON_CompElmRecExpr( <expr> )  . . . . . . . . . . . . . . . .  T_ELM_REC_EXPR
 */
-CVar CompElmRecExpr (
+CVar JSON_CompElmRecExpr (
     Expr                expr )
 {
     CVar                elm;            /* element, result                 */
     CVar                record;         /* the record, left operand        */
     CVar                rnam;           /* the name, right operand         */
 
-    Emit("{ \"type\":\"CompElmRecExpr\", \"record\":");
+    JSON_Emit("{ \"type\":\"JSON_CompElmRecExpr\", \"record\":");
 
     /* allocate a new temporary for the element                            */
-    elm = CVAR_TEMP( NewTemp( "elm" ) );
+    elm = CVAR_TEMP( JSON_NewTemp( "elm" ) );
 
     /* compile the record expression (checking is done by 'ELM_REC')       */
-    record = CompExpr( ADDR_EXPR(expr)[0] );
+    record = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"name\":");
+    JSON_Emit(", \"name\":");
 
     /* compile the record name expression                                  */
-    rnam = CompExpr( ADDR_EXPR(expr)[1] );
+    rnam = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code to select the element of the record                   */
-    //Emit( "%c = ELM_REC( %c, RNamObj(%c) );\n", elm, record, rnam );
+    //JSON_Emit( "%c = ELM_REC( %c, RNamObj(%c) );\n", elm, record, rnam );
 
     /* we know that we have a value                                        */
-    SetInfoCVar( elm, W_BOUND );
+    JSON_SetInfoCVar( elm, W_BOUND );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( rnam   ) )  FreeTemp( TEMP_CVAR( rnam   ) );
-    if ( IS_TEMP_CVAR( record ) )  FreeTemp( TEMP_CVAR( record ) );
+    if ( IS_TEMP_CVAR( rnam   ) )  JSON_FreeTemp( TEMP_CVAR( rnam   ) );
+    if ( IS_TEMP_CVAR( record ) )  JSON_FreeTemp( TEMP_CVAR( record ) );
 
     /* return the element                                                  */
     return elm;
@@ -3631,41 +3630,41 @@ CVar CompElmRecExpr (
 
 /****************************************************************************
 **
-*F  CompIsbRecName( <expr> )  . . . . . . . . . . . . . . . .  T_ISB_REC_NAME
+*F  JSON_CompIsbRecName( <expr> )  . . . . . . . . . . . . . . . .  T_ISB_REC_NAME
 */
-CVar CompIsbRecName (
+CVar JSON_CompIsbRecName (
     Expr                expr )
 {
     CVar                isb;            /* isbound, result                 */
     CVar                record;         /* the record, left operand        */
     UInt                rnam;           /* the name, right operand         */
 
-    Emit("{ \"type\":\"CompIsbRecName\", \"record\":");
+    JSON_Emit("{ \"type\":\"JSON_CompIsbRecName\", \"record\":");
 
     /* allocate a new temporary for the result                             */
-    isb = CVAR_TEMP( NewTemp( "isb" ) );
+    isb = CVAR_TEMP( JSON_NewTemp( "isb" ) );
 
     /* compile the record expression (checking is done by 'ISB_REC')       */
-    record = CompExpr( ADDR_EXPR(expr)[0] );
+    record = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"name\":");
+    JSON_Emit(", \"name\":");
 
     /* get the name (stored immediately in the expression)                 */
     rnam = (UInt)(ADDR_EXPR(expr)[1]);
-    Emit("\"%s\"", NAME_RNAM(rnam));
-    CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
+    JSON_Emit("\"%s\"", NAME_RNAM(rnam));
+    JSON_CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
     /* emit the code to test the element                                   */
-    //Emit( "%c = (ISB_REC( %c, R_%n ) ? True : False);\n",
+    //JSON_Emit( "%c = (ISB_REC( %c, R_%n ) ? True : False);\n",
     //      isb, record, NAME_RNAM(rnam) );
 
     /* we know that the result is boolean                                  */
-    SetInfoCVar( isb, W_BOOL );
+    JSON_SetInfoCVar( isb, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( record ) )  FreeTemp( TEMP_CVAR( record ) );
+    if ( IS_TEMP_CVAR( record ) )  JSON_FreeTemp( TEMP_CVAR( record ) );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* return the result                                                   */
     return isb;
@@ -3674,40 +3673,40 @@ CVar CompIsbRecName (
 
 /****************************************************************************
 **
-*F  CompIsbRecExpr( <expr> )  . . . . . . . . . . . . . . . .  T_ISB_REC_EXPR
+*F  JSON_CompIsbRecExpr( <expr> )  . . . . . . . . . . . . . . . .  T_ISB_REC_EXPR
 */
-CVar CompIsbRecExpr (
+CVar JSON_CompIsbRecExpr (
     Expr                expr )
 {
     CVar                isb;            /* isbound, result                 */
     CVar                record;         /* the record, left operand        */
     CVar                rnam;           /* the name, right operand         */
 
-    Emit("{\"type\":\"CompIsbRecExpr\", \"record\":");
+    JSON_Emit("{\"type\":\"JSON_CompIsbRecExpr\", \"record\":");
 
     /* allocate a new temporary for the result                             */
-    isb = CVAR_TEMP( NewTemp( "isb" ) );
+    isb = CVAR_TEMP( JSON_NewTemp( "isb" ) );
 
     /* compile the record expression (checking is done by 'ISB_REC')       */
-    record = CompExpr( ADDR_EXPR(expr)[0] );
+    record = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"name\":");
+    JSON_Emit(", \"name\":");
 
     /* compile the record name expression                                  */
-    rnam = CompExpr( ADDR_EXPR(expr)[1] );
+    rnam = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code to test the element                                   */
-    //Emit( "%c = (ISB_REC( %c, RNamObj(%c) ) ? True : False);\n",
+    //JSON_Emit( "%c = (ISB_REC( %c, RNamObj(%c) ) ? True : False);\n",
     //      isb, record, rnam );
 
     /* we know that the result is boolean                                  */
-    SetInfoCVar( isb, W_BOOL );
+    JSON_SetInfoCVar( isb, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( rnam   ) )  FreeTemp( TEMP_CVAR( rnam   ) );
-    if ( IS_TEMP_CVAR( record ) )  FreeTemp( TEMP_CVAR( record ) );
+    if ( IS_TEMP_CVAR( rnam   ) )  JSON_FreeTemp( TEMP_CVAR( rnam   ) );
+    if ( IS_TEMP_CVAR( record ) )  JSON_FreeTemp( TEMP_CVAR( record ) );
 
     /* return the result                                                   */
     return isb;
@@ -3716,39 +3715,39 @@ CVar CompIsbRecExpr (
 
 /****************************************************************************
 **
-*F  CompElmPosObj( <expr> ) . . . . . . . . . . . . . . . . . .  T_ELM_POSOBJ
+*F  JSON_CompElmPosObj( <expr> ) . . . . . . . . . . . . . . . . . .  T_ELM_POSOBJ
 */
-CVar CompElmPosObj (
+CVar JSON_CompElmPosObj (
     Expr                expr )
 {
     CVar                elm;            /* element, result                 */
     CVar                list;           /* list                            */
     CVar                pos;            /* position                        */
 
-    Emit("{\"type\":\"getListElement\", \"compiledIn\":\"CompElmPosObj\""
+    JSON_Emit("{\"type\":\"getListElement\", \"compiledIn\":\"JSON_CompElmPosObj\""
          ", \"list\":"
     );
 
     /* allocate a new temporary for the element                            */
-    elm = CVAR_TEMP( NewTemp( "elm" ) );
+    elm = CVAR_TEMP( JSON_NewTemp( "elm" ) );
 
     /* compile the list expression (checking is done by 'ELM_LIST')        */
-    list = CompExpr( ADDR_EXPR(expr)[0] );
+    list = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"position\":");
+    JSON_Emit(", \"position\":");
 
     /* compile and check the position expression                           */
-    pos = CompExpr( ADDR_EXPR(expr)[1] );
-    CompCheckIntSmallPos( pos );
+    pos = JSON_CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_CompCheckIntSmallPos( pos );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* we know that we have a value                                        */
-    SetInfoCVar( elm, W_BOUND );
+    JSON_SetInfoCVar( elm, W_BOUND );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( pos  ) )  FreeTemp( TEMP_CVAR( pos  ) );
-    if ( IS_TEMP_CVAR( list ) )  FreeTemp( TEMP_CVAR( list ) );
+    if ( IS_TEMP_CVAR( pos  ) )  JSON_FreeTemp( TEMP_CVAR( pos  ) );
+    if ( IS_TEMP_CVAR( list ) )  JSON_FreeTemp( TEMP_CVAR( list ) );
 
     /* return the element                                                  */
     return elm;
@@ -3757,85 +3756,85 @@ CVar CompElmPosObj (
 
 /****************************************************************************
 **
-*F  CompElmsPosObj( <expr> )  . . . . . . . . . . . . . . . . . T_ELMS_POSOBJ
+*F  JSON_CompElmsPosObj( <expr> )  . . . . . . . . . . . . . . . . . T_ELMS_POSOBJ
 */
-CVar CompElmsPosObj (
+CVar JSON_CompElmsPosObj (
     Expr                expr )
 {
-    //Emit( "CANNOT COMPILE EXPRESSION OF TNUM %d;\n", TNUM_EXPR(expr) );
+    //JSON_Emit( "CANNOT COMPILE EXPRESSION OF TNUM %d;\n", TNUM_EXPR(expr) );
     return 0;
 }
 
 
 /****************************************************************************
 **
-*F  CompElmPosObjLev( <expr> )  . . . . . . . . . . . . . .  T_ELM_POSOBJ_LEV
+*F  JSON_CompElmPosObjLev( <expr> )  . . . . . . . . . . . . . .  T_ELM_POSOBJ_LEV
 */
-CVar CompElmPosObjLev (
+CVar JSON_CompElmPosObjLev (
     Expr                expr )
 {
-    //Emit( "CANNOT COMPILE EXPRESSION OF TNUM %d;\n", TNUM_EXPR(expr) );
+    //JSON_Emit( "CANNOT COMPILE EXPRESSION OF TNUM %d;\n", TNUM_EXPR(expr) );
     return 0;
 }
 
 
 /****************************************************************************
 **
-*F  CompElmsPosObjLev( <expr> ) . . . . . . . . . . . . . . . . T_ELMS_POSOBJ
+*F  JSON_CompElmsPosObjLev( <expr> ) . . . . . . . . . . . . . . . . T_ELMS_POSOBJ
 */
-CVar CompElmsPosObjLev (
+CVar JSON_CompElmsPosObjLev (
     Expr                expr )
 {
-    //Emit( "CANNOT COMPILE EXPRESSION OF TNUM %d;\n", TNUM_EXPR(expr) );
+    //JSON_Emit( "CANNOT COMPILE EXPRESSION OF TNUM %d;\n", TNUM_EXPR(expr) );
     return 0;
 }
 
 
 /****************************************************************************
 **
-*F  CompIsbPosObj( <expr> ) . . . . . . . . . . . . . . . . . .  T_ISB_POSOBJ
+*F  JSON_CompIsbPosObj( <expr> ) . . . . . . . . . . . . . . . . . .  T_ISB_POSOBJ
 */
-CVar CompIsbPosObj (
+CVar JSON_CompIsbPosObj (
     Expr                expr )
 {
     CVar                isb;            /* isbound, result                 */
     CVar                list;           /* list                            */
     CVar                pos;            /* position                        */
 
-    Emit("{ \"type\":\"CompIsbPosObj\", \"list\":");
+    JSON_Emit("{ \"type\":\"JSON_CompIsbPosObj\", \"list\":");
 
     /* allocate a new temporary for the result                             */
-    isb = CVAR_TEMP( NewTemp( "isb" ) );
+    isb = CVAR_TEMP( JSON_NewTemp( "isb" ) );
 
     /* compile the list expression (checking is done by 'ISB_LIST')        */
-    list = CompExpr( ADDR_EXPR(expr)[0] );
+    list = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"pos\":");
+    JSON_Emit(", \"pos\":");
 
     /* compile and check the position expression                           */
-    pos = CompExpr( ADDR_EXPR(expr)[1] );
-    CompCheckIntSmallPos( pos );
+    pos = JSON_CompExpr( ADDR_EXPR(expr)[1] );
+    JSON_CompCheckIntSmallPos( pos );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code to test the element                                   */
-    //Emit( "if ( TNUM_OBJ(%c) == T_POSOBJ ) {\n", list );
-    //Emit( "%c = (%i <= SIZE_OBJ(%c)/sizeof(Obj)-1\n", isb, pos, list );
-    //Emit( "   && ELM_PLIST(%c,%i) != 0 ? True : False);\n", list, pos );
-    //Emit( "#ifdef HPCGAP\n" );
-    //Emit( "} else if ( TNUM_OBJ(%c) == T_APOSOBJ ) {\n", list );
-    //Emit( "%c = Elm0AList(%c,%i) != 0 ? True : False;\n", isb, list, pos );
-    //Emit( "#endif\n" );
-    //Emit( "}\nelse {\n" );
-    //Emit( "%c = (ISB_LIST( %c, %i ) ? True : False);\n", isb, list, pos );
-    //Emit( "}\n" );
+    //JSON_Emit( "if ( TNUM_OBJ(%c) == T_POSOBJ ) {\n", list );
+    //JSON_Emit( "%c = (%i <= SIZE_OBJ(%c)/sizeof(Obj)-1\n", isb, pos, list );
+    //JSON_Emit( "   && ELM_PLIST(%c,%i) != 0 ? True : False);\n", list, pos );
+    //JSON_Emit( "#ifdef HPCGAP\n" );
+    //JSON_Emit( "} else if ( TNUM_OBJ(%c) == T_APOSOBJ ) {\n", list );
+    //JSON_Emit( "%c = Elm0AList(%c,%i) != 0 ? True : False;\n", isb, list, pos );
+    //JSON_Emit( "#endif\n" );
+    //JSON_Emit( "}\nelse {\n" );
+    //JSON_Emit( "%c = (ISB_LIST( %c, %i ) ? True : False);\n", isb, list, pos );
+    //JSON_Emit( "}\n" );
 
     /* we know that the result is boolean                                  */
-    SetInfoCVar( isb, W_BOOL );
+    JSON_SetInfoCVar( isb, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( pos  ) )  FreeTemp( TEMP_CVAR( pos  ) );
-    if ( IS_TEMP_CVAR( list ) )  FreeTemp( TEMP_CVAR( list ) );
+    if ( IS_TEMP_CVAR( pos  ) )  JSON_FreeTemp( TEMP_CVAR( pos  ) );
+    if ( IS_TEMP_CVAR( list ) )  JSON_FreeTemp( TEMP_CVAR( list ) );
 
     /* return the element                                                  */
     return isb;
@@ -3844,9 +3843,9 @@ CVar CompIsbPosObj (
 
 /****************************************************************************
 **
-*F  CompElmObjName( <expr> )  . . . . . . . . . . . . . . . T_ELM_COMOBJ_NAME
+*F  JSON_CompElmObjName( <expr> )  . . . . . . . . . . . . . . . T_ELM_COMOBJ_NAME
 */
-CVar CompElmComObjName (
+CVar JSON_CompElmComObjName (
     Expr                expr )
 {
     CVar                elm;            /* element, result                 */
@@ -3854,38 +3853,38 @@ CVar CompElmComObjName (
     UInt                rnam;           /* the name, right operand         */
 
     /* allocate a new temporary for the element                            */
-    elm = CVAR_TEMP( NewTemp( "elm" ) );
+    elm = CVAR_TEMP( JSON_NewTemp( "elm" ) );
 
-    Emit("{\"type\":\"recordAccess\", \"record\":");
+    JSON_Emit("{\"type\":\"recordAccess\", \"record\":");
 
     /* compile the record expression (checking is done by 'ELM_REC')       */
-    record = CompExpr( ADDR_EXPR(expr)[0] );
+    record = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"name\":");
+    JSON_Emit(", \"name\":");
 
     /* get the name (stored immediately in the expression)                 */
     rnam = (UInt)(ADDR_EXPR(expr)[1]);
-    Emit("\"%s\"", NAME_RNAM(rnam));
-    CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
+    JSON_Emit("\"%s\"", NAME_RNAM(rnam));
+    JSON_CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code to select the element of the record                   */
-    //Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
-    //Emit( "%c = ElmPRec( %c, R_%n );\n", elm, record, NAME_RNAM(rnam) );
-    //Emit( "#ifdef HPCGAP\n" );
-    //Emit( "} else if ( TNUM_OBJ(%c) == T_ACOMOBJ) {\n", record );
-    //Emit( "%c = ElmARecord( %c, R_%n );\n", elm, record, NAME_RNAM(rnam) );
-    //Emit( "#endif\n" );
-    //Emit( "}\nelse {\n" );
-    //Emit( "%c = ELM_REC( %c, R_%n );\n", elm, record, NAME_RNAM(rnam) );
-    //Emit( "}\n" );
+    //JSON_Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
+    //JSON_Emit( "%c = ElmPRec( %c, R_%n );\n", elm, record, NAME_RNAM(rnam) );
+    //JSON_Emit( "#ifdef HPCGAP\n" );
+    //JSON_Emit( "} else if ( TNUM_OBJ(%c) == T_ACOMOBJ) {\n", record );
+    //JSON_Emit( "%c = ElmARecord( %c, R_%n );\n", elm, record, NAME_RNAM(rnam) );
+    //JSON_Emit( "#endif\n" );
+    //JSON_Emit( "}\nelse {\n" );
+    //JSON_Emit( "%c = ELM_REC( %c, R_%n );\n", elm, record, NAME_RNAM(rnam) );
+    //JSON_Emit( "}\n" );
 
     /* we know that we have a value                                        */
-    SetInfoCVar( elm, W_BOUND );
+    JSON_SetInfoCVar( elm, W_BOUND );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( record ) )  FreeTemp( TEMP_CVAR( record ) );
+    if ( IS_TEMP_CVAR( record ) )  JSON_FreeTemp( TEMP_CVAR( record ) );
 
     /* return the element                                                  */
     return elm;
@@ -3895,49 +3894,49 @@ CVar CompElmComObjName (
 
 /****************************************************************************
 **
-*F  CompElmComObjExpr( <expr> ) . . . . . . . . . . . . . . T_ELM_COMOBJ_EXPR
+*F  JSON_CompElmComObjExpr( <expr> ) . . . . . . . . . . . . . . T_ELM_COMOBJ_EXPR
 */
-CVar CompElmComObjExpr (
+CVar JSON_CompElmComObjExpr (
     Expr                expr )
 {
     CVar                elm;            /* element, result                 */
     CVar                record;         /* the record, left operand        */
     CVar                rnam;           /* the name, right operand         */
 
-    Emit("{ \"type\":\"CompElmComObjExpr\", ");
+    JSON_Emit("{ \"type\":\"JSON_CompElmComObjExpr\", ");
 
     /* allocate a new temporary for the element                            */
-    elm = CVAR_TEMP( NewTemp( "elm" ) );
+    elm = CVAR_TEMP( JSON_NewTemp( "elm" ) );
 
-    Emit("\"record\":");
+    JSON_Emit("\"record\":");
 
     /* compile the record expression (checking is done by 'ELM_REC')       */
-    record = CompExpr( ADDR_EXPR(expr)[0] );
+    record = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"name\":");
+    JSON_Emit(", \"name\":");
 
     /* get the name (stored immediately in the expression)                 */
-    rnam = CompExpr( ADDR_EXPR(expr)[1] );
+    rnam = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code to select the element of the record                   */
-    //Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
-    //Emit( "%c = ElmPRec( %c, RNamObj(%c) );\n", elm, record, rnam );
-    //Emit( "#ifdef HPCGAP\n" );
-    //Emit( "} else if ( TNUM_OBJ(%c) == T_ACOMOBJ ) {\n", record );
-    //Emit( "%c = ElmARecord( %c, RNamObj(%c) );\n", elm, record, rnam );
-    //Emit( "#endif\n" );
-    //Emit( "}\nelse {\n" );
-    //Emit( "%c = ELM_REC( %c, RNamObj(%c) );\n", elm, record, rnam );
-    //Emit( "}\n" );
+    //JSON_Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
+    //JSON_Emit( "%c = ElmPRec( %c, RNamObj(%c) );\n", elm, record, rnam );
+    //JSON_Emit( "#ifdef HPCGAP\n" );
+    //JSON_Emit( "} else if ( TNUM_OBJ(%c) == T_ACOMOBJ ) {\n", record );
+    //JSON_Emit( "%c = ElmARecord( %c, RNamObj(%c) );\n", elm, record, rnam );
+    //JSON_Emit( "#endif\n" );
+    //JSON_Emit( "}\nelse {\n" );
+    //JSON_Emit( "%c = ELM_REC( %c, RNamObj(%c) );\n", elm, record, rnam );
+    //JSON_Emit( "}\n" );
 
     /* we know that we have a value                                        */
-    SetInfoCVar( elm, W_BOUND );
+    JSON_SetInfoCVar( elm, W_BOUND );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( rnam   ) )  FreeTemp( TEMP_CVAR( rnam   ) );
-    if ( IS_TEMP_CVAR( record ) )  FreeTemp( TEMP_CVAR( record ) );
+    if ( IS_TEMP_CVAR( rnam   ) )  JSON_FreeTemp( TEMP_CVAR( rnam   ) );
+    if ( IS_TEMP_CVAR( record ) )  JSON_FreeTemp( TEMP_CVAR( record ) );
 
     /* return the element                                                  */
     return elm;
@@ -3946,51 +3945,51 @@ CVar CompElmComObjExpr (
 
 /****************************************************************************
 **
-*F  CompIsbComObjName( <expr> ) . . . . . . . . . . . . . . T_ISB_COMOBJ_NAME
+*F  JSON_CompIsbComObjName( <expr> ) . . . . . . . . . . . . . . T_ISB_COMOBJ_NAME
 */
-CVar CompIsbComObjName (
+CVar JSON_CompIsbComObjName (
     Expr                expr )
 {
     CVar                isb;            /* isbound, result                 */
     CVar                record;         /* the record, left operand        */
     UInt                rnam;           /* the name, right operand         */
 
-    Emit("{\"type\":\"CompIsbComObjName\", \"record\":");
+    JSON_Emit("{\"type\":\"JSON_CompIsbComObjName\", \"record\":");
 
     /* allocate a new temporary for the result                             */
-    isb = CVAR_TEMP( NewTemp( "isb" ) );
+    isb = CVAR_TEMP( JSON_NewTemp( "isb" ) );
 
     /* compile the record expression (checking is done by 'ISB_REC')       */
-    record = CompExpr( ADDR_EXPR(expr)[0] );
+    record = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"name\":");
+    JSON_Emit(", \"name\":");
 
     /* get the name (stored immediately in the expression)                 */
     rnam = (UInt)(ADDR_EXPR(expr)[1]);
-    Emit("\"%s\"", NAME_RNAM(rnam));
-    CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
+    JSON_Emit("\"%s\"", NAME_RNAM(rnam));
+    JSON_CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code to test the element                                   */
-    //Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
-    //Emit( "%c = (IsbPRec( %c, R_%n ) ? True : False);\n",
+    //JSON_Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
+    //JSON_Emit( "%c = (IsbPRec( %c, R_%n ) ? True : False);\n",
     //      isb, record, NAME_RNAM(rnam) );
-    //Emit( "#ifdef HPCGAP\n" );
-    //Emit( "} else if ( TNUM_OBJ(%c) == T_ACOMOBJ ) {\n", record );
-    //Emit( "%c = (IsbARecord( %c, R_%n ) ? True : False);\n",
+    //JSON_Emit( "#ifdef HPCGAP\n" );
+    //JSON_Emit( "} else if ( TNUM_OBJ(%c) == T_ACOMOBJ ) {\n", record );
+    //JSON_Emit( "%c = (IsbARecord( %c, R_%n ) ? True : False);\n",
     //            isb, record, NAME_RNAM(rnam) );
-    //Emit( "#endif\n" );
-    //Emit( "}\nelse {\n" );
-    //Emit( "%c = (ISB_REC( %c, R_%n ) ? True : False);\n",
+    //JSON_Emit( "#endif\n" );
+    //JSON_Emit( "}\nelse {\n" );
+    //JSON_Emit( "%c = (ISB_REC( %c, R_%n ) ? True : False);\n",
     //      isb, record, NAME_RNAM(rnam) );
-    //Emit( "}\n" );
+    //JSON_Emit( "}\n" );
 
     /* we know that the result is boolean                                  */
-    SetInfoCVar( isb, W_BOOL );
+    JSON_SetInfoCVar( isb, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( record ) )  FreeTemp( TEMP_CVAR( record ) );
+    if ( IS_TEMP_CVAR( record ) )  JSON_FreeTemp( TEMP_CVAR( record ) );
 
     /* return the result                                                   */
     return isb;
@@ -3999,50 +3998,50 @@ CVar CompIsbComObjName (
 
 /****************************************************************************
 **
-*F  CompIsbComObjExpr( <expr> ) . . . . . . . . . . . . . . T_ISB_COMOBJ_EXPR
+*F  JSON_CompIsbComObjExpr( <expr> ) . . . . . . . . . . . . . . T_ISB_COMOBJ_EXPR
 */
-CVar CompIsbComObjExpr (
+CVar JSON_CompIsbComObjExpr (
     Expr                expr )
 {
     CVar                isb;            /* isbound, result                 */
     CVar                record;         /* the record, left operand        */
     UInt                rnam;           /* the name, right operand         */
 
-    Emit("{ \"type\":\"CompIsbComObjExpr\", \"record\":");
+    JSON_Emit("{ \"type\":\"JSON_CompIsbComObjExpr\", \"record\":");
 
     /* allocate a new temporary for the result                             */
-    isb = CVAR_TEMP( NewTemp( "isb" ) );
+    isb = CVAR_TEMP( JSON_NewTemp( "isb" ) );
 
     /* compile the record expression (checking is done by 'ISB_REC')       */
-    record = CompExpr( ADDR_EXPR(expr)[0] );
+    record = JSON_CompExpr( ADDR_EXPR(expr)[0] );
 
-    Emit(", \"name\":");
+    JSON_Emit(", \"name\":");
 
     /* get the name (stored immediately in the expression)                 */
-    rnam = CompExpr( ADDR_EXPR(expr)[1] );
+    rnam = JSON_CompExpr( ADDR_EXPR(expr)[1] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code to test the element                                   */
-    //Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
-    //Emit( "%c = (IsbPRec( %c, RNamObj(%c) ) ? True : False);\n",
+    //JSON_Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
+    //JSON_Emit( "%c = (IsbPRec( %c, RNamObj(%c) ) ? True : False);\n",
     //      isb, record, rnam );
-    //Emit( "#ifdef HPCGAP\n" );
-    //Emit( "} else if ( TNUM_OBJ(%c) == T_ACOMOBJ ) {\n", record );
-    //Emit( "%c = (IsbARecord( %c, RNamObj(%c) ) ? True : False);\n",
+    //JSON_Emit( "#ifdef HPCGAP\n" );
+    //JSON_Emit( "} else if ( TNUM_OBJ(%c) == T_ACOMOBJ ) {\n", record );
+    //JSON_Emit( "%c = (IsbARecord( %c, RNamObj(%c) ) ? True : False);\n",
     //            isb, record, rnam );
-    //Emit( "#endif\n" );
-    //Emit( "}\nelse {\n" );
-    //Emit( "%c = (ISB_REC( %c, RNamObj(%c) ) ? True : False);\n",
+    //JSON_Emit( "#endif\n" );
+    //JSON_Emit( "}\nelse {\n" );
+    //JSON_Emit( "%c = (ISB_REC( %c, RNamObj(%c) ) ? True : False);\n",
     //      isb, record, rnam );
-    //Emit( "}\n" );
+    //JSON_Emit( "}\n" );
 
     /* we know that the result is boolean                                  */
-    SetInfoCVar( isb, W_BOOL );
+    JSON_SetInfoCVar( isb, W_BOOL );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( rnam   ) )  FreeTemp( TEMP_CVAR( rnam   ) );
-    if ( IS_TEMP_CVAR( record ) )  FreeTemp( TEMP_CVAR( record ) );
+    if ( IS_TEMP_CVAR( rnam   ) )  JSON_FreeTemp( TEMP_CVAR( rnam   ) );
+    if ( IS_TEMP_CVAR( record ) )  JSON_FreeTemp( TEMP_CVAR( record ) );
 
     /* return the result                                                   */
     return isb;
@@ -4059,31 +4058,31 @@ CVar CompIsbComObjExpr (
 /****************************************************************************
 **
 
-*F  CompStat( <stat> )  . . . . . . . . . . . . . . . . . compile a statement
+*F  JSON_CompStat( <stat> )  . . . . . . . . . . . . . . . . . compile a statement
 **
-**  'CompStat' compiles the statement <stat>.
+**  'JSON_CompStat' compiles the statement <stat>.
 */
-void (* CompStatFuncs[256]) ( Stat stat );
+void (* JSON_CompStatFuncs[256]) ( Stat stat );
 
-void CompStat (
+void JSON_CompStat (
     Stat                stat )
 {
     //emit line number
-    Emit("{ \"type\":\"debugInfo\", \"line\":%d, \"stat\":", LINE_STAT(stat));
-    (* CompStatFuncs[ TNUM_STAT(stat) ])( stat );
-    Emit("}");
+    JSON_Emit("{ \"type\":\"debugInfo\", \"line\":%d, \"stat\":", LINE_STAT(stat));
+    (* JSON_CompStatFuncs[ TNUM_STAT(stat) ])( stat );
+    JSON_Emit("}");
 }
 
 
 /****************************************************************************
 **
-*F  CompUnknownStat( <stat> ) . . . . . . . . . . . . . . . . signal an error
+*F  JSON_CompUnknownStat( <stat> ) . . . . . . . . . . . . . . . . signal an error
 */
-void CompUnknownStat (
+void JSON_CompUnknownStat (
     Stat                stat )
 {
     printf("ERROR: unknownStat");
-    //Emit( "CANNOT COMPILE STATEMENT OF TNUM %d;\n", TNUM_STAT(stat) );
+    //JSON_Emit( "CANNOT COMPILE STATEMENT OF TNUM %d;\n", TNUM_STAT(stat) );
 }
 
 
@@ -4096,9 +4095,9 @@ GVar G_Add;
 
 /****************************************************************************
 **
-*F  CompProccall0to6Args( <stat> )  . . . T_PROCCALL_0ARGS...T_PROCCALL_6ARGS
+*F  JSON_CompProccall0to6Args( <stat> )  . . . T_PROCCALL_0ARGS...T_PROCCALL_6ARGS
 */
-void CompProccall0to6Args (
+void JSON_CompProccall0to6Args (
     Stat                stat )
 {
     CVar                func;           /* function                        */
@@ -4106,43 +4105,43 @@ void CompProccall0to6Args (
     UInt                narg;           /* number of arguments             */
     UInt                i;              /* loop variable                   */
 
-    Emit( "{ \"type\":\"functionCall\", \"name\":");
+    JSON_Emit( "{ \"type\":\"functionCall\", \"name\":");
 
     /* compile the reference to the function                               */
     if ( TNUM_EXPR( FUNC_CALL(stat) ) == T_REF_GVAR ) {
-        func = CompRefGVarFopy( FUNC_CALL(stat) );
-//        Emit("%s", NAME_FUNC( FUNC_CALL(stat) ));
+        func = JSON_CompRefGVarFopy( FUNC_CALL(stat) );
+//        JSON_Emit("%s", NAME_FUNC( FUNC_CALL(stat) ));
     }
     else {
-        func = CompExpr( FUNC_CALL(stat) );
+        func = JSON_CompExpr( FUNC_CALL(stat) );
     }
 
-    Emit(", \"args\":[");
+    JSON_Emit(", \"args\":[");
 
     /* compile the argument expressions                                    */
     narg = NARG_SIZE_CALL(SIZE_STAT(stat));
     for ( i = 1; i <= narg; i++ ) {
-        args[i] = CompExpr( ARGI_CALL(stat,i) );
+        args[i] = JSON_CompExpr( ARGI_CALL(stat,i) );
         if( i < narg) {
-            Emit( ", " );
+            JSON_Emit( ", " );
         }
     }
 
-    Emit( "]}" );
+    JSON_Emit( "]}" );
 
     /* free the temporaries                                                */
     for ( i = narg; 1 <= i; i-- ) {
-        if ( IS_TEMP_CVAR( args[i] ) )  FreeTemp( TEMP_CVAR( args[i] ) );
+        if ( IS_TEMP_CVAR( args[i] ) )  JSON_FreeTemp( TEMP_CVAR( args[i] ) );
     }
-    if ( IS_TEMP_CVAR( func ) )  FreeTemp( TEMP_CVAR( func ) );
+    if ( IS_TEMP_CVAR( func ) )  JSON_FreeTemp( TEMP_CVAR( func ) );
 }
 
 
 /****************************************************************************
 **
-*F  CompProccallXArgs . . . . . . . . . . . . . . . . . . .  T_PROCCALL_XARGS
+*F  JSON_CompProccallXArgs . . . . . . . . . . . . . . . . . . .  T_PROCCALL_XARGS
 */
-void CompProccallXArgs (
+void JSON_CompProccallXArgs (
     Stat                stat )
 {
     CVar                func;           /* function                        */
@@ -4151,76 +4150,76 @@ void CompProccallXArgs (
     UInt                narg;           /* number of arguments             */
     UInt                i;              /* loop variable                   */
 
-    Emit( "{ \"type\":\"functionCall\", \"name\":" );
+    JSON_Emit( "{ \"type\":\"functionCall\", \"name\":" );
 
     /* compile the reference to the function                               */
     if ( TNUM_EXPR( FUNC_CALL(stat) ) == T_REF_GVAR ) {
-        func = CompRefGVarFopy( FUNC_CALL(stat) );
+        func = JSON_CompRefGVarFopy( FUNC_CALL(stat) );
     }
     else {
-        func = CompExpr( FUNC_CALL(stat) );
-        CompCheckFunc( func );
+        func = JSON_CompExpr( FUNC_CALL(stat) );
+        JSON_CompCheckFunc( func );
     }
 
-    Emit(",\"args\":[");
+    JSON_Emit(",\"args\":[");
 
     /* compile the argument expressions                                    */
     narg = NARG_SIZE_CALL(SIZE_STAT(stat));
-    argl = CVAR_TEMP( NewTemp( "argl" ) );
-    //Emit( "%c = NEW_PLIST( T_PLIST, %d );\n", argl, narg );
-    //Emit( "SET_LEN_PLIST( %c, %d );\n", argl, narg );
+    argl = CVAR_TEMP( JSON_NewTemp( "argl" ) );
+    //JSON_Emit( "%c = NEW_PLIST( T_PLIST, %d );\n", argl, narg );
+    //JSON_Emit( "SET_LEN_PLIST( %c, %d );\n", argl, narg );
     for ( i = 1; i <= narg; i++ ) {
-        argi = CompExpr( ARGI_CALL( stat, i ) );
-        //Emit( "SET_ELM_PLIST( %c, %d, %c );\n", argl, i, argi );
-        if ( ! HasInfoCVar( argi, W_INT_SMALL ) ) {
-            //Emit( "CHANGED_BAG( %c );\n", argl );
+        argi = JSON_CompExpr( ARGI_CALL( stat, i ) );
+        //JSON_Emit( "SET_ELM_PLIST( %c, %d, %c );\n", argl, i, argi );
+        if ( ! JSON_HasInfoCVar( argi, W_INT_SMALL ) ) {
+            //JSON_Emit( "CHANGED_BAG( %c );\n", argl );
         }
-        if ( IS_TEMP_CVAR( argi ) )  FreeTemp( TEMP_CVAR( argi ) );
+        if ( IS_TEMP_CVAR( argi ) )  JSON_FreeTemp( TEMP_CVAR( argi ) );
 
         if( i < narg) {
-          Emit(", ");
+          JSON_Emit(", ");
         }
     }
 
-    Emit( "]}" );
+    JSON_Emit( "]}" );
 
     /* emit the code for the procedure call                                */
-    //Emit( "CALL_XARGS( %c, %c );\n", func, argl );
+    //JSON_Emit( "CALL_XARGS( %c, %c );\n", func, argl );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( argl ) )  FreeTemp( TEMP_CVAR( argl ) );
-    if ( IS_TEMP_CVAR( func ) )  FreeTemp( TEMP_CVAR( func ) );
+    if ( IS_TEMP_CVAR( argl ) )  JSON_FreeTemp( TEMP_CVAR( argl ) );
+    if ( IS_TEMP_CVAR( func ) )  JSON_FreeTemp( TEMP_CVAR( func ) );
 }
 
 /****************************************************************************
 **
-*F  CompProccallXArgs( <expr> ) . . . . . . . . . . . . . .  T_PROCCALL_OPTS
+*F  JSON_CompProccallXArgs( <expr> ) . . . . . . . . . . . . . .  T_PROCCALL_OPTS
 */
-void CompProccallOpts(
+void JSON_CompProccallOpts(
                       Stat stat)
 {
-  Emit("{ \"type\":\"ProccallOpts\", \"opts\":");
-  CVar opts = CompExpr(ADDR_STAT(stat)[0]);
+  JSON_Emit("{ \"type\":\"ProccallOpts\", \"opts\":");
+  CVar opts = JSON_CompExpr(ADDR_STAT(stat)[0]);
   GVar pushOptions;
   GVar popOptions;
   pushOptions = GVarName("PushOptions");
   popOptions = GVarName("PopOptions");
-  CompSetUseGVar(pushOptions, COMP_USE_GVAR_FOPY);
-  CompSetUseGVar(popOptions, COMP_USE_GVAR_FOPY);
-  //Emit("CALL_1ARGS( GF_PushOptions, %c );\n", opts);
-  if (IS_TEMP_CVAR( opts) ) FreeTemp( TEMP_CVAR( opts ));
-  Emit(", \"proc\":");
-  CompStat(ADDR_STAT(stat)[1]);
-  //Emit("CALL_0ARGS( GF_PopOptions );\n");
-  Emit("}");
+  JSON_CompSetUseGVar(pushOptions, COMP_USE_GVAR_FOPY);
+  JSON_CompSetUseGVar(popOptions, COMP_USE_GVAR_FOPY);
+  //JSON_Emit("CALL_1ARGS( GF_PushOptions, %c );\n", opts);
+  if (IS_TEMP_CVAR( opts) ) JSON_FreeTemp( TEMP_CVAR( opts ));
+  JSON_Emit(", \"proc\":");
+  JSON_CompStat(ADDR_STAT(stat)[1]);
+  //JSON_Emit("CALL_0ARGS( GF_PopOptions );\n");
+  JSON_Emit("}");
 }
      
 
 /****************************************************************************
 **
-*F  CompSeqStat( <stat> ) . . . . . . . . . . . . .  T_SEQ_STAT...T_SEQ_STAT7
+*F  JSON_CompSeqStat( <stat> ) . . . . . . . . . . . . .  T_SEQ_STAT...T_SEQ_STAT7
 */
-void CompSeqStat (
+void JSON_CompSeqStat (
     Stat                stat )
 {
     UInt                nr;             /* number of statements            */
@@ -4229,25 +4228,25 @@ void CompSeqStat (
     /* get the number of statements                                        */
     nr = SIZE_STAT( stat ) / sizeof(Stat);
 
-    Emit("[");
+    JSON_Emit("[");
 
     /* compile the statements                                              */
     for ( i = 1; i <= nr; i++ ) {
-        CompStat( ADDR_STAT( stat )[i-1] );
+        JSON_CompStat( ADDR_STAT( stat )[i-1] );
         if( i < nr) {
-          Emit(", ");
+          JSON_Emit(", ");
         }
     }
 
-    Emit("]");
+    JSON_Emit("]");
 }
 
 
 /****************************************************************************
 **
-*F  CompIf( <stat> )  . . . . . . . . T_IF/T_IF_ELSE/T_IF_ELIF/T_IF_ELIF_ELSE
+*F  JSON_CompIf( <stat> )  . . . . . . . . T_IF/T_IF_ELSE/T_IF_ELIF/T_IF_ELIF_ELSE
 */
-void CompIf (
+void JSON_CompIf (
     Stat                stat )
 {
     CVar                cond;           /* condition                       */
@@ -4259,28 +4258,28 @@ void CompIf (
     /* get the number of branches                                          */
     nr = SIZE_STAT( stat ) / (2*sizeof(Stat));
 
-    Emit( "{\"type\":\"if\", \"cond\":" );
-//    Emit("open");
+    JSON_Emit( "{\"type\":\"if\", \"cond\":" );
+//    JSON_Emit("open");
 
     /* compile the expression                                              */
-    cond = CompBoolExpr( ADDR_STAT( stat )[0] );
+    cond = JSON_CompBoolExpr( ADDR_STAT( stat )[0] );
 
-    Emit( ", \"then\":" );
+    JSON_Emit( ", \"then\":" );
 
     /* emit the code to test the condition                                 */
-    //Emit( "if ( %c ) {\n", cond );
-    if ( IS_TEMP_CVAR( cond ) )  FreeTemp( TEMP_CVAR( cond ) );
+    //JSON_Emit( "if ( %c ) {\n", cond );
+    if ( IS_TEMP_CVAR( cond ) )  JSON_FreeTemp( TEMP_CVAR( cond ) );
 
     /* remember what we know after evaluating the first condition          */
-    info_in = NewInfoCVars();
-    CopyInfoCVars( info_in, INFO_FEXP(CURR_FUNC) );
+    info_in = JSON_NewInfoCVars();
+    JSON_CopyInfoCVars( info_in, INFO_FEXP(CURR_FUNC) );
 
     /* compile the body                                                    */
-    CompStat( ADDR_STAT( stat )[1] );
+    JSON_CompStat( ADDR_STAT( stat )[1] );
 
     /* remember what we know after executing the first body                */
-    info_out = NewInfoCVars();
-    CopyInfoCVars( info_out, INFO_FEXP(CURR_FUNC) );
+    info_out = JSON_NewInfoCVars();
+    JSON_CopyInfoCVars( info_out, INFO_FEXP(CURR_FUNC) );
 
     /* emit the rest code                                                  */
 
@@ -4291,64 +4290,64 @@ void CompIf (
         if ( i == nr && TNUM_EXPR(ADDR_STAT(stat)[2*(i-1)]) == T_TRUE_EXPR )
             break;
 
-        Emit( ",\"else\":{\"type\":\"if\", \"cond\":" );
-    //    Emit("open");
+        JSON_Emit( ",\"else\":{\"type\":\"if\", \"cond\":" );
+    //    JSON_Emit("open");
 
         /* emit the 'else' to connect this branch to the 'if' branch       */
-        //Emit( "else {\n" );
+        //JSON_Emit( "else {\n" );
 
         /* this is what we know if we enter this branch                    */
-        CopyInfoCVars( INFO_FEXP(CURR_FUNC), info_in );
+        JSON_CopyInfoCVars( INFO_FEXP(CURR_FUNC), info_in );
 
         /* compile the expression                                          */
-        cond = CompBoolExpr( ADDR_STAT( stat )[2*(i-1)] );
+        cond = JSON_CompBoolExpr( ADDR_STAT( stat )[2*(i-1)] );
 
-        Emit( ", \"then\":" );
+        JSON_Emit( ", \"then\":" );
 
         /* emit the code to test the condition                             */
-        //Emit( "if ( %c ) {\n", cond );
-        if ( IS_TEMP_CVAR( cond ) )  FreeTemp( TEMP_CVAR( cond ) );
+        //JSON_Emit( "if ( %c ) {\n", cond );
+        if ( IS_TEMP_CVAR( cond ) )  JSON_FreeTemp( TEMP_CVAR( cond ) );
 
         /* remember what we know after evaluating all previous conditions  */
-        CopyInfoCVars( info_in, INFO_FEXP(CURR_FUNC) );
+        JSON_CopyInfoCVars( info_in, INFO_FEXP(CURR_FUNC) );
 
         /* compile the body                                                */
-        CompStat( ADDR_STAT( stat )[2*(i-1)+1] );
+        JSON_CompStat( ADDR_STAT( stat )[2*(i-1)+1] );
 
         /* remember what we know after executing one of the previous bodies*/
-        MergeInfoCVars( info_out, INFO_FEXP(CURR_FUNC) );
+        JSON_MergeInfoCVars( info_out, INFO_FEXP(CURR_FUNC) );
     }
 
     /* handle 'else' branch                                                */
     if ( i == nr ) {
 
-        Emit( ",\"else\":" );
+        JSON_Emit( ",\"else\":" );
 
         /* emit the 'else' to connect this branch to the 'if' branch       */
-        //Emit( "else {\n" );
+        //JSON_Emit( "else {\n" );
 
         /* this is what we know if we enter this branch                    */
-        CopyInfoCVars( INFO_FEXP(CURR_FUNC), info_in );
+        JSON_CopyInfoCVars( INFO_FEXP(CURR_FUNC), info_in );
 
         /* compile the body                                                */
-        CompStat( ADDR_STAT( stat )[2*(i-1)+1] );
+        JSON_CompStat( ADDR_STAT( stat )[2*(i-1)+1] );
 
         /* remember what we know after executing one of the previous bodies*/
-        MergeInfoCVars( info_out, INFO_FEXP(CURR_FUNC) );
+        JSON_MergeInfoCVars( info_out, INFO_FEXP(CURR_FUNC) );
     }
 
     /* fake empty 'else' branch                                            */
     else {
 
-       // if( CompPass == 2) {
-       //   Emit("else=''");
+       // if( JSON_CompPass == 2) {
+       //   JSON_Emit("else=''");
        // }
 
         /* this is what we know if we enter this branch                    */
-        CopyInfoCVars( INFO_FEXP(CURR_FUNC), info_in );
+        JSON_CopyInfoCVars( INFO_FEXP(CURR_FUNC), info_in );
 
         /* remember what we know after executing one of the previous bodies*/
-        MergeInfoCVars( info_out, INFO_FEXP(CURR_FUNC) );
+        JSON_MergeInfoCVars( info_out, INFO_FEXP(CURR_FUNC) );
 
     }
 
@@ -4356,23 +4355,23 @@ void CompIf (
     for ( i = 2; i <= nr; i++ ) {
         if ( i == nr && TNUM_EXPR(ADDR_STAT(stat)[2*(i-1)]) == T_TRUE_EXPR )
             break;
-        Emit( "}" );
-   //     Emit("close");
+        JSON_Emit( "}" );
+   //     JSON_Emit("close");
     }
     
-    Emit( "}" );
-    //Emit("endOfElse close");
+    JSON_Emit( "}" );
+    //JSON_Emit("endOfElse close");
 
     /* put what we know into the current info                              */
-    CopyInfoCVars( INFO_FEXP(CURR_FUNC), info_out );
+    JSON_CopyInfoCVars( INFO_FEXP(CURR_FUNC), info_out );
 }
 
 
 /****************************************************************************
 **
-*F  CompFor( <stat> ) . . . . . . . T_FOR...T_FOR3/T_FOR_RANGE...T_FOR_RANGE3
+*F  JSON_CompFor( <stat> ) . . . . . . . T_FOR...T_FOR3/T_FOR_RANGE...T_FOR_RANGE3
 */
-void CompFor (
+void JSON_CompFor (
     Stat                stat )
 {
     UInt                var;            /* loop variable                   */
@@ -4387,94 +4386,94 @@ void CompFor (
     Bag                 prev;           /* previous temp-info              */
     Int                 i;              /* loop variable                   */
 
-    Emit( "{ \"type\":\"for\", \"var\":\"" );
+    JSON_Emit( "{ \"type\":\"for\", \"var\":\"" );
 
     /* handle 'for <lvar> in [<first>..<last>] do'                         */
     if ( IS_REFLVAR( ADDR_STAT(stat)[0] )
-      && ! CompGetUseHVar( LVAR_REFLVAR( ADDR_STAT(stat)[0] ) )
+      && ! JSON_CompGetUseHVar( LVAR_REFLVAR( ADDR_STAT(stat)[0] ) )
       && TNUM_EXPR( ADDR_STAT(stat)[1] ) == T_RANGE_EXPR
       && SIZE_EXPR( ADDR_STAT(stat)[1] ) == 2*sizeof(Expr) ) {
 
         /* get the local variable                                          */
         var = LVAR_REFLVAR( ADDR_STAT(stat)[0] );
 
-        Emit("%s", NAME_LVAR( var ));
-        Emit( "\", \"in\":" );
+        JSON_Emit("%s", NAME_LVAR( var ));
+        JSON_Emit( "\", \"in\":" );
 
         /* allocate a new temporary for the loop variable                  */
-        lidx = CVAR_TEMP( NewTemp( "lidx" ) );
+        lidx = CVAR_TEMP( JSON_NewTemp( "lidx" ) );
 
-        Emit("{\"type\":\"range\", \"first\":");
+        JSON_Emit("{\"type\":\"range\", \"first\":");
 
         /* compile and check the first and last value                      */
-        first = CompExpr( ADDR_EXPR( ADDR_STAT(stat)[1] )[0] );
+        first = JSON_CompExpr( ADDR_EXPR( ADDR_STAT(stat)[1] )[0] );
 
-        Emit(", \"last\":");
+        JSON_Emit(", \"last\":");
 
         /* compile and check the last value                                */
         /* if the last value is in a local variable,                       */
         /* we must copy it into a temporary,                               */
         /* because the local variable may change its value in the body     */
-        last  = CompExpr( ADDR_EXPR( ADDR_STAT(stat)[1] )[1] );
+        last  = JSON_CompExpr( ADDR_EXPR( ADDR_STAT(stat)[1] )[1] );
 
-        Emit("}");
+        JSON_Emit("}");
 
         if ( IS_LVAR_CVAR(last) ) {
-            elm = CVAR_TEMP( NewTemp( "last" ) );
-            //Emit( "%c = %c;\n", elm, last );
+            elm = CVAR_TEMP( JSON_NewTemp( "last" ) );
+            //JSON_Emit( "%c = %c;\n", elm, last );
             last = elm;
         }
 
         ///* find the invariant temp-info                                    */
-        //pass = CompPass;
-        //CompPass = 99;
-        //prev = NewInfoCVars();
+        //pass = JSON_CompPass;
+        //JSON_CompPass = 99;
+        //prev = JSON_NewInfoCVars();
         //do {
-        //    CopyInfoCVars( prev, INFO_FEXP(CURR_FUNC) );
-        //    if ( HasInfoCVar( first, W_INT_SMALL_POS ) ) {
-        //        SetInfoCVar( CVAR_LVAR(var), W_INT_SMALL_POS );
+        //    JSON_CopyInfoCVars( prev, INFO_FEXP(CURR_FUNC) );
+        //    if ( JSON_HasInfoCVar( first, W_INT_SMALL_POS ) ) {
+        //        JSON_SetInfoCVar( CVAR_LVAR(var), W_INT_SMALL_POS );
         //    }
         //    else {
-        //        SetInfoCVar( CVAR_LVAR(var), W_INT_SMALL );
+        //        JSON_SetInfoCVar( CVAR_LVAR(var), W_INT_SMALL );
         //    }
         //    //TODO: what is this? why is this loop compiled twice?
         //    for ( i = 2; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
-        //        CompStat( ADDR_STAT(stat)[i] );
+        //        JSON_CompStat( ADDR_STAT(stat)[i] );
         //    }
-        //    MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
-        //} while ( ! IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
-        //CompPass = pass;
+        //    JSON_MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
+        //} while ( ! JSON_IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
+        //JSON_CompPass = pass;
 
         /* emit the code for the loop                                      */
-        //Emit( "for ( %c = %c;\n",                lidx, first );
-        //Emit( "      ((Int)%c) <= ((Int)%c);\n", lidx, last  );
-        //Emit( "      %c = (Obj)(((UInt)%c)+4) ", lidx, lidx  );
-        //Emit( ") {\n" );
+        //JSON_Emit( "for ( %c = %c;\n",                lidx, first );
+        //JSON_Emit( "      ((Int)%c) <= ((Int)%c);\n", lidx, last  );
+        //JSON_Emit( "      %c = (Obj)(((UInt)%c)+4) ", lidx, lidx  );
+        //JSON_Emit( ") {\n" );
 
         /* emit the code to copy the loop index into the loop variable     */
-        //Emit( "%c = %c;\n", CVAR_LVAR(var), lidx );
+        //JSON_Emit( "%c = %c;\n", CVAR_LVAR(var), lidx );
 
         /* set what we know about the loop variable                        */
-        if ( HasInfoCVar( first, W_INT_SMALL_POS ) ) {
-            SetInfoCVar( CVAR_LVAR(var), W_INT_SMALL_POS );
+        if ( JSON_HasInfoCVar( first, W_INT_SMALL_POS ) ) {
+            JSON_SetInfoCVar( CVAR_LVAR(var), W_INT_SMALL_POS );
         }
         else {
-            SetInfoCVar( CVAR_LVAR(var), W_INT_SMALL );
+            JSON_SetInfoCVar( CVAR_LVAR(var), W_INT_SMALL );
         }
 
-        Emit(", \"do\":[");
+        JSON_Emit(", \"do\":[");
         /* compile the body                                                */
         for ( i = 2; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
             if(i > 2) {
-                Emit(",");
+                JSON_Emit(",");
             }
-            CompStat( ADDR_STAT(stat)[i] );
+            JSON_CompStat( ADDR_STAT(stat)[i] );
         }
 
         /* free the temporaries                                            */
-        if ( IS_TEMP_CVAR( last  ) )  FreeTemp( TEMP_CVAR( last  ) );
-        if ( IS_TEMP_CVAR( first ) )  FreeTemp( TEMP_CVAR( first ) );
-        if ( IS_TEMP_CVAR( lidx  ) )  FreeTemp( TEMP_CVAR( lidx  ) );
+        if ( IS_TEMP_CVAR( last  ) )  JSON_FreeTemp( TEMP_CVAR( last  ) );
+        if ( IS_TEMP_CVAR( first ) )  JSON_FreeTemp( TEMP_CVAR( first ) );
+        if ( IS_TEMP_CVAR( lidx  ) )  JSON_FreeTemp( TEMP_CVAR( lidx  ) );
 
     }
     /* handle other loops                                                  */
@@ -4484,7 +4483,7 @@ void CompFor (
         
         /* get the variable (initialize them first to please 'lint')       */
         if ( IS_REFLVAR( ADDR_STAT(stat)[0] )
-          && ! CompGetUseHVar( LVAR_REFLVAR( ADDR_STAT(stat)[0] ) ) ) {
+          && ! JSON_CompGetUseHVar( LVAR_REFLVAR( ADDR_STAT(stat)[0] ) ) ) {
             var = LVAR_REFLVAR( ADDR_STAT(stat)[0] );
             vart = 'l';
         }
@@ -4494,7 +4493,7 @@ void CompFor (
         }
         else if ( T_REF_LVAR <= TNUM_EXPR( ADDR_STAT(stat)[0] )
                && TNUM_EXPR( ADDR_STAT(stat)[0] ) <= T_REF_LVAR_16
-               && ! CompGetUseHVar( ADDR_EXPR( ADDR_STAT(stat)[0] )[0] ) ) {
+               && ! JSON_CompGetUseHVar( ADDR_EXPR( ADDR_STAT(stat)[0] )[0] ) ) {
             var = (UInt)(ADDR_EXPR( ADDR_STAT(stat)[0] )[0]);
             vart = 'l';
         }
@@ -4509,104 +4508,104 @@ void CompFor (
         }
         else /* if ( TNUM_EXPR( ADDR_STAT(stat)[0] ) == T_REF_GVAR ) */ {
             var = (UInt)(ADDR_EXPR( ADDR_STAT(stat)[0] )[0]);
-            CompSetUseGVar( var, COMP_USE_GVAR_ID );
+            JSON_CompSetUseGVar( var, COMP_USE_GVAR_ID );
             vart = 'g';
         }
 
         if(vart == 'l' || vart == 'm') {
-            Emit("%s", NAME_LVAR( var ));
+            JSON_Emit("%s", NAME_LVAR( var ));
         } else if(vart == 'g') {
-          Emit( "%s", NameGVar(var));
+          JSON_Emit( "%s", NameGVar(var));
         } else if(vart == 'h') {
-          Emit( "%s", NAME_HVAR(var));
+          JSON_Emit( "%s", NAME_HVAR(var));
         }
 
-        Emit( "\", \"in\":" );
+        JSON_Emit( "\", \"in\":" );
 
         /* allocate a new temporary for the loop variable                  */
-        lidx   = CVAR_TEMP( NewTemp( "lidx"   ) );
-        elm    = CVAR_TEMP( NewTemp( "elm"    ) );
-        islist = CVAR_TEMP( NewTemp( "islist" ) );
+        lidx   = CVAR_TEMP( JSON_NewTemp( "lidx"   ) );
+        elm    = CVAR_TEMP( JSON_NewTemp( "elm"    ) );
+        islist = CVAR_TEMP( JSON_NewTemp( "islist" ) );
 
         /* compile and check the first and last value                      */
-        list = CompExpr( ADDR_STAT(stat)[1] );
+        list = JSON_CompExpr( ADDR_STAT(stat)[1] );
 
         /* SL Patch added to try and avoid a bug */
         if (IS_LVAR_CVAR(list))
           {
             CVar copylist;
-            copylist = CVAR_TEMP( NewTemp( "copylist" ) );
-            //Emit("%c = %c;\n",copylist, list);
+            copylist = CVAR_TEMP( JSON_NewTemp( "copylist" ) );
+            //JSON_Emit("%c = %c;\n",copylist, list);
             list = copylist;
           }
         /* end of SL patch */
 
         ///* find the invariant temp-info                                    */
-        //pass = CompPass;
-        //CompPass = 99;
-        //prev = NewInfoCVars();
+        //pass = JSON_CompPass;
+        //JSON_CompPass = 99;
+        //prev = JSON_NewInfoCVars();
         //do {
-        //    CopyInfoCVars( prev, INFO_FEXP(CURR_FUNC) );
+        //    JSON_CopyInfoCVars( prev, INFO_FEXP(CURR_FUNC) );
         //    if ( vart == 'l' ) {
-        //        SetInfoCVar( CVAR_LVAR(var), W_BOUND );
+        //        JSON_SetInfoCVar( CVAR_LVAR(var), W_BOUND );
         //    }
         //    for ( i = 2; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
-        //        CompStat( ADDR_STAT(stat)[i] );
+        //        JSON_CompStat( ADDR_STAT(stat)[i] );
         //    }
-        //    MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
-        //} while ( ! IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
-        //CompPass = pass;
+        //    JSON_MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
+        //} while ( ! JSON_IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
+        //JSON_CompPass = pass;
 
 
         /* emit the code to copy the loop index into the loop variable     */
         if ( vart == 'l' ) {
-            //Emit( "%c = %c;\n",
+            //JSON_Emit( "%c = %c;\n",
             //      CVAR_LVAR(var), elm );
         }
         else if ( vart == 'm' ) {
-            //Emit( "ASS_LVAR( %d, %c );\n",
-            //      GetIndxHVar(var), elm );
+            //JSON_Emit( "ASS_LVAR( %d, %c );\n",
+            //      JSON_GetIndxHVar(var), elm );
         }
         else if ( vart == 'h' ) {
-            //Emit( "ASS_LVAR_%dUP( %d, %c );\n",
-            //      GetLevlHVar(var), GetIndxHVar(var), elm );
+            //JSON_Emit( "ASS_LVAR_%dUP( %d, %c );\n",
+            //      JSON_GetLevlHVar(var), JSON_GetIndxHVar(var), elm );
         }
         else if ( vart == 'g' ) {
-            //Emit( "AssGVar( G_%n, %c );\n",
+            //JSON_Emit( "AssGVar( G_%n, %c );\n",
             //      NameGVar(var), elm );
         }
 
         /* set what we know about the loop variable                        */
         if ( vart == 'l' ) {
-            SetInfoCVar( CVAR_LVAR(var), W_BOUND );
+            JSON_SetInfoCVar( CVAR_LVAR(var), W_BOUND );
         }
 
-        Emit(", \"do\":[");
+        JSON_Emit(", \"do\":[");
 
         /* compile the body                                                */
         for ( i = 2; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
             if(i > 2) {
-                Emit(",");
+                JSON_Emit(",");
             }
-            CompStat( ADDR_STAT(stat)[i] );
+            JSON_CompStat( ADDR_STAT(stat)[i] );
         }
 
         /* free the temporaries                                            */
-        if ( IS_TEMP_CVAR( list   ) )  FreeTemp( TEMP_CVAR( list   ) );
-        if ( IS_TEMP_CVAR( islist ) )  FreeTemp( TEMP_CVAR( islist ) );
-        if ( IS_TEMP_CVAR( elm    ) )  FreeTemp( TEMP_CVAR( elm    ) );
-        if ( IS_TEMP_CVAR( lidx   ) )  FreeTemp( TEMP_CVAR( lidx   ) );
+        if ( IS_TEMP_CVAR( list   ) )  JSON_FreeTemp( TEMP_CVAR( list   ) );
+        if ( IS_TEMP_CVAR( islist ) )  JSON_FreeTemp( TEMP_CVAR( islist ) );
+        if ( IS_TEMP_CVAR( elm    ) )  JSON_FreeTemp( TEMP_CVAR( elm    ) );
+        if ( IS_TEMP_CVAR( lidx   ) )  JSON_FreeTemp( TEMP_CVAR( lidx   ) );
     }
   
-    Emit( "]}" );
+    JSON_Emit( "]}" );
 }
 
 
 /****************************************************************************
 **
-*F  CompWhile( <stat> ) . . . . . . . . . . . . . . . . .  T_WHILE...T_WHILE3
+*F  JSON_CompWhile( <stat> ) . . . . . . . . . . . . . . . . .  T_WHILE...T_WHILE3
 */
-void CompWhile (
+void JSON_CompWhile (
     Stat                stat )
 {
     CVar                cond;           /* condition                       */
@@ -4616,55 +4615,55 @@ void CompWhile (
 
     /* find an invariant temp-info                                         */
     /* the emits are probably not needed                                   */
-    //pass = CompPass;
-    //CompPass = 99;
-    ////Emit( "while ( 1 ) {\n" );
-    //prev = NewInfoCVars();
+    //pass = JSON_CompPass;
+    //JSON_CompPass = 99;
+    ////JSON_Emit( "while ( 1 ) {\n" );
+    //prev = JSON_NewInfoCVars();
     //do {
-    //    CopyInfoCVars( prev, INFO_FEXP(CURR_FUNC) );
-    //    cond = CompBoolExpr( ADDR_STAT(stat)[0] );
-    //    //Emit( "if ( ! %c ) break;\n", cond );
-    //    if ( IS_TEMP_CVAR( cond ) )  FreeTemp( TEMP_CVAR( cond ) );
+    //    JSON_CopyInfoCVars( prev, INFO_FEXP(CURR_FUNC) );
+    //    cond = JSON_CompBoolExpr( ADDR_STAT(stat)[0] );
+    //    //JSON_Emit( "if ( ! %c ) break;\n", cond );
+    //    if ( IS_TEMP_CVAR( cond ) )  JSON_FreeTemp( TEMP_CVAR( cond ) );
     //    for ( i = 1; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
-    //        CompStat( ADDR_STAT(stat)[i] );
+    //        JSON_CompStat( ADDR_STAT(stat)[i] );
     //    }
-    //    MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
-    //} while ( ! IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
-    ////Emit( "}\n" );
-    //CompPass = pass;
+    //    JSON_MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
+    //} while ( ! JSON_IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
+    ////JSON_Emit( "}\n" );
+    //JSON_CompPass = pass;
 
-    Emit( "{\"type\":\"while\", \"cond\":" );
+    JSON_Emit( "{\"type\":\"while\", \"cond\":" );
 
     /* emit the code for the loop                                          */
-    //Emit( "while ( 1 ) {\n" );
+    //JSON_Emit( "while ( 1 ) {\n" );
 
     /* compile the condition                                               */
-    cond = CompBoolExpr( ADDR_STAT(stat)[0] );
-    //Emit( "if ( ! %c ) break;\n", cond );
-    if ( IS_TEMP_CVAR( cond ) )  FreeTemp( TEMP_CVAR( cond ) );
+    cond = JSON_CompBoolExpr( ADDR_STAT(stat)[0] );
+    //JSON_Emit( "if ( ! %c ) break;\n", cond );
+    if ( IS_TEMP_CVAR( cond ) )  JSON_FreeTemp( TEMP_CVAR( cond ) );
 
-    Emit( ", \"do\":[" );
+    JSON_Emit( ", \"do\":[" );
 
     /* compile the body                                                    */
     for ( i = 1; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
         if( i > 1) {
-            Emit(", ");
+            JSON_Emit(", ");
         }
-        CompStat( ADDR_STAT(stat)[i] );
+        JSON_CompStat( ADDR_STAT(stat)[i] );
     }
 
     /* thats it                                                            */
-    Emit( "]}" );
-    //Emit( "/* od */\n" );
+    JSON_Emit( "]}" );
+    //JSON_Emit( "/* od */\n" );
 
 }
 
 
 /****************************************************************************
 **
-*F  CompRepeat( <stat> )  . . . . . . . . . . . . . . .  T_REPEAT...T_REPEAT3
+*F  JSON_CompRepeat( <stat> )  . . . . . . . . . . . . . . .  T_REPEAT...T_REPEAT3
 */
-void CompRepeat (
+void JSON_CompRepeat (
     Stat                stat )
 {
     CVar                cond;           /* condition                       */
@@ -4674,283 +4673,283 @@ void CompRepeat (
 
     ///* find an invariant temp-info                                         */
     ///* the emits are probably not needed                                   */
-    //pass = CompPass;
-    //CompPass = 99;
-    ////Emit( "do {\n" );
-    //prev = NewInfoCVars();
+    //pass = JSON_CompPass;
+    //JSON_CompPass = 99;
+    ////JSON_Emit( "do {\n" );
+    //prev = JSON_NewInfoCVars();
     //do {
-    //    CopyInfoCVars( prev, INFO_FEXP(CURR_FUNC) );
+    //    JSON_CopyInfoCVars( prev, INFO_FEXP(CURR_FUNC) );
     //    for ( i = 1; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
-    //        CompStat( ADDR_STAT(stat)[i] );
+    //        JSON_CompStat( ADDR_STAT(stat)[i] );
     //    }
-    //    cond = CompBoolExpr( ADDR_STAT(stat)[0] );
-    //    if ( IS_TEMP_CVAR( cond ) )  FreeTemp( TEMP_CVAR( cond ) );
-    //    MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
-    //} while ( ! IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
-    //CompPass = pass;
+    //    cond = JSON_CompBoolExpr( ADDR_STAT(stat)[0] );
+    //    if ( IS_TEMP_CVAR( cond ) )  JSON_FreeTemp( TEMP_CVAR( cond ) );
+    //    JSON_MergeInfoCVars( INFO_FEXP(CURR_FUNC), prev );
+    //} while ( ! JSON_IsEqInfoCVars( INFO_FEXP(CURR_FUNC), prev ) );
+    //JSON_CompPass = pass;
     
 
-    Emit("{\"type\":\"repeat\", \"do\":[");
+    JSON_Emit("{\"type\":\"repeat\", \"do\":[");
 
     /* compile the body                                                    */
     for ( i = 1; i < SIZE_STAT(stat)/sizeof(Stat); i++ ) {
-        if(i > 1) { Emit(",");}
-        CompStat( ADDR_STAT(stat)[i] );
+        if(i > 1) { JSON_Emit(",");}
+        JSON_CompStat( ADDR_STAT(stat)[i] );
     }
 
-    Emit("], \"until\":");
+    JSON_Emit("], \"until\":");
 
     /* compile the condition                                               */
-    cond = CompBoolExpr( ADDR_STAT(stat)[0] );
+    cond = JSON_CompBoolExpr( ADDR_STAT(stat)[0] );
     
-    if ( IS_TEMP_CVAR( cond ) )  FreeTemp( TEMP_CVAR( cond ) );
+    if ( IS_TEMP_CVAR( cond ) )  JSON_FreeTemp( TEMP_CVAR( cond ) );
 
-    Emit( " }" );
+    JSON_Emit( " }" );
 }
 
 
 /****************************************************************************
 **
-*F  CompBreak( <stat> ) . . . . . . . . . . . . . . . . . . . . . . . T_BREAK
+*F  JSON_CompBreak( <stat> ) . . . . . . . . . . . . . . . . . . . . . . . T_BREAK
 */
-void CompBreak (
+void JSON_CompBreak (
     Stat                stat )
 {
     /* print a comment                                                     */
-    if ( CompPass == 2 ) {
-        Emit( "{\"type\":\"break\"}" );// PrintStat( stat ); //Emit( " */\n" );
+    if ( JSON_CompPass == 2 ) {
+        JSON_Emit( "{\"type\":\"break\"}" );// PrintStat( stat ); //JSON_Emit( " */\n" );
     }
 
-    //Emit( "break;\n" );
+    //JSON_Emit( "break;\n" );
 }
 
 /****************************************************************************
 **
-*F  CompContinue( <stat> ) . . . . . . . . . . . . . . . . . . . . T_CONTINUE
+*F  JSON_CompContinue( <stat> ) . . . . . . . . . . . . . . . . . . . . T_CONTINUE
 */
-void CompContinue (
+void JSON_CompContinue (
     Stat                stat )
 {
-        //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-        Emit( "{\"type\":\"continue\"}" ); //PrintStat( stat ); //Emit( " */\n" );
+        //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+        JSON_Emit( "{\"type\":\"continue\"}" ); //PrintStat( stat ); //JSON_Emit( " */\n" );
 
-    //Emit( "continue;\n" );
+    //JSON_Emit( "continue;\n" );
 }
 
 
 /****************************************************************************
 **
-*F  CompReturnObj( <stat> ) . . . . . . . . . . . . . . . . . .  T_RETURN_OBJ
+*F  JSON_CompReturnObj( <stat> ) . . . . . . . . . . . . . . . . . .  T_RETURN_OBJ
 */
-void CompReturnObj (
+void JSON_CompReturnObj (
     Stat                stat )
 {
     CVar                obj;            /* returned object                 */
 
-        //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( " {\"return\":" ); 
+        //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( " {\"return\":" ); 
 
     /* compile the expression                                              */
-    obj = CompExpr( ADDR_STAT(stat)[0] );
+    obj = JSON_CompExpr( ADDR_STAT(stat)[0] );
 
     /* emit code to remove stack frame                                     */
-    //Emit( "RES_BRK_CURR_STAT();\n" );
-    //Emit( "SWITCH_TO_OLD_FRAME(oldFrame);\n" );
+    //JSON_Emit( "RES_BRK_CURR_STAT();\n" );
+    //JSON_Emit( "SWITCH_TO_OLD_FRAME(oldFrame);\n" );
 
     /* emit code to return from function                                   */
-    //Emit( "return %c;\n", obj );
+    //JSON_Emit( "return %c;\n", obj );
 
     /* free the temporary                                                  */
-    if ( IS_TEMP_CVAR( obj ) )  FreeTemp( TEMP_CVAR( obj ) );
+    if ( IS_TEMP_CVAR( obj ) )  JSON_FreeTemp( TEMP_CVAR( obj ) );
     
-    Emit( "} " );
+    JSON_Emit( "} " );
 }
 
 
 /****************************************************************************
 **
-*F  CompReturnVoid( <stat> )  . . . . . . . . . . . . . . . . . T_RETURN_VOID
+*F  JSON_CompReturnVoid( <stat> )  . . . . . . . . . . . . . . . . . T_RETURN_VOID
 */
-void CompReturnVoid (
+void JSON_CompReturnVoid (
     Stat                stat )
 {
-    Emit("{ \"type\":\"return\", \"void\":\"true\"}");
+    JSON_Emit("{ \"type\":\"return\", \"void\":\"true\"}");
 }
 
 
 /****************************************************************************
 **
-*F  CompAssLVar( <stat> ) . . . . . . . . . . . .  T_ASS_LVAR...T_ASS_LVAR_16
+*F  JSON_CompAssLVar( <stat> ) . . . . . . . . . . . .  T_ASS_LVAR...T_ASS_LVAR_16
 */
-void            CompAssLVar (
+void            JSON_CompAssLVar (
     Stat                stat )
 {
     LVar                lvar;           /* local variable                  */
     CVar                rhs;            /* right hand side                 */
 
     //TODO
-    Emit( "{\"type\":\"assign\", \"subtype\":\"LVar\", " );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"LVar\", " );
 
-    Emit("\"right\":");
+    JSON_Emit("\"right\":");
     /* compile the right hand side expression                              */
-    rhs = CompExpr( ADDR_STAT(stat)[1] );
+    rhs = JSON_CompExpr( ADDR_STAT(stat)[1] );
 
-    Emit(", \"left\":");
+    JSON_Emit(", \"left\":");
     /* emit the code for the assignment                                    */
     lvar = (LVar)(ADDR_STAT(stat)[0]);
-    if ( CompGetUseHVar( lvar ) ) {
-        //Emit( "ASS_LVAR( %d, %c );\n", GetIndxHVar(lvar), rhs );
-        Emit( "\"t_%d\"", GetIndxHVar(lvar));
+    if ( JSON_CompGetUseHVar( lvar ) ) {
+        //JSON_Emit( "ASS_LVAR( %d, %c );\n", JSON_GetIndxHVar(lvar), rhs );
+        JSON_Emit( "\"t_%d\"", JSON_GetIndxHVar(lvar));
     }
     else {
-        //Emit( "%c = %c;\n", CVAR_LVAR(lvar), rhs );
-        Emit( "\"%s\"", NAME_LVAR(lvar));
-//        SetInfoCVar( CVAR_LVAR(lvar), GetInfoCVar( rhs ) );
+        //JSON_Emit( "%c = %c;\n", CVAR_LVAR(lvar), rhs );
+        JSON_Emit( "\"%s\"", NAME_LVAR(lvar));
+//        JSON_SetInfoCVar( CVAR_LVAR(lvar), JSON_GetInfoCVar( rhs ) );
     }
 
     /* free the temporary                                                  */
-    if ( IS_TEMP_CVAR( rhs ) )  FreeTemp( TEMP_CVAR( rhs ) );
+    if ( IS_TEMP_CVAR( rhs ) )  JSON_FreeTemp( TEMP_CVAR( rhs ) );
     
-    Emit( "}" );
+    JSON_Emit( "}" );
 }
 
 
 /****************************************************************************
 **
-*F  CompUnbLVar( <stat> ) . . . . . . . . . . . . . . . . . . . .  T_UNB_LVAR
+*F  JSON_CompUnbLVar( <stat> ) . . . . . . . . . . . . . . . . . . . .  T_UNB_LVAR
 */
-void CompUnbLVar (
+void JSON_CompUnbLVar (
     Stat                stat )
 {
     LVar                lvar;           /* local variable                  */
 
-    //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{\"type\":\"assign\", \"subtype\":\"UnbLVar\", " );
+    //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"UnbLVar\", " );
 
     /* emit the code for the assignment                                    */
     lvar = (LVar)(ADDR_STAT(stat)[0]);
 
-    Emit("\"identifier\":\"%s\"", NAME_LVAR(lvar));
-    if ( CompGetUseHVar( lvar ) ) {
-        //Emit( "ASS_LVAR( %d, 0 );\n", GetIndxHVar(lvar) );
+    JSON_Emit("\"identifier\":\"%s\"", NAME_LVAR(lvar));
+    if ( JSON_CompGetUseHVar( lvar ) ) {
+        //JSON_Emit( "ASS_LVAR( %d, 0 );\n", JSON_GetIndxHVar(lvar) );
     }
     else {
-        //Emit( "%c = 0;\n", CVAR_LVAR( lvar ) );
-        SetInfoCVar( lvar, W_UNBOUND );
+        //JSON_Emit( "%c = 0;\n", CVAR_LVAR( lvar ) );
+        JSON_SetInfoCVar( lvar, W_UNBOUND );
     }
     
-    Emit( "}" );
+    JSON_Emit( "}" );
 }
 
 
 /****************************************************************************
 **
-*F  CompAssHVar( <stat> ) . . . . . . . . . . . . . . . . . . . .  T_ASS_HVAR
+*F  JSON_CompAssHVar( <stat> ) . . . . . . . . . . . . . . . . . . . .  T_ASS_HVAR
 */
-void CompAssHVar (
+void JSON_CompAssHVar (
     Stat                stat )
 {
     HVar                hvar;           /* higher variable                 */
     CVar                rhs;            /* right hand side                 */
 
-    //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{\"type\":\"assign\", \"subtype\":\"HVar\", \"rhs\":" );
+    //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"HVar\", \"rhs\":" );
 
     /* compile the right hand side expression                              */
-    rhs = CompExpr( ADDR_STAT(stat)[1] );
+    rhs = JSON_CompExpr( ADDR_STAT(stat)[1] );
 
     /* emit the code for the assignment                                    */
     hvar = (HVar)(ADDR_STAT(stat)[0]);
-    CompSetUseHVar( hvar );
-    Emit(", \"identifier\":\"%s\"", NAME_HVAR(hvar));
-    //Emit( "ASS_LVAR_%dUP( %d, %c );\n",
-    //       GetLevlHVar(hvar), GetIndxHVar(hvar), rhs );
+    JSON_CompSetUseHVar( hvar );
+    JSON_Emit(", \"identifier\":\"%s\"", NAME_HVAR(hvar));
+    //JSON_Emit( "ASS_LVAR_%dUP( %d, %c );\n",
+    //       JSON_GetLevlHVar(hvar), JSON_GetIndxHVar(hvar), rhs );
 
     /* free the temporary                                                  */
-    if ( IS_TEMP_CVAR( rhs ) )  FreeTemp( TEMP_CVAR( rhs ) );
+    if ( IS_TEMP_CVAR( rhs ) )  JSON_FreeTemp( TEMP_CVAR( rhs ) );
     
-    Emit( "}" );
+    JSON_Emit( "}" );
 }
 
 
 /****************************************************************************
 **
-*F  CompUnbHVar( <stat> ) . . . . . . . . . . . . . . . . . . . .  T_UNB_HVAR
+*F  JSON_CompUnbHVar( <stat> ) . . . . . . . . . . . . . . . . . . . .  T_UNB_HVAR
 */
-void CompUnbHVar (
+void JSON_CompUnbHVar (
     Stat                stat )
 {
     HVar                hvar;           /* higher variable                 */
 
     /* print a comment                                                     */
-     //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{\"type\":\"assign\", \"subtype\":\"UnbHVar\", " );
+     //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"UnbHVar\", " );
 
     /* emit the code for the assignment                                    */
     hvar = (HVar)(ADDR_STAT(stat)[0]);
-    CompSetUseHVar( hvar );
-    Emit("\"identifier\":\"%s\"", NAME_HVAR(hvar));
-    //Emit( "ASS_LVAR_%dUP( %d, 0 );\n",
-    //      GetLevlHVar(hvar), GetIndxHVar(hvar) );
-    Emit( "}" );
+    JSON_CompSetUseHVar( hvar );
+    JSON_Emit("\"identifier\":\"%s\"", NAME_HVAR(hvar));
+    //JSON_Emit( "ASS_LVAR_%dUP( %d, 0 );\n",
+    //      JSON_GetLevlHVar(hvar), JSON_GetIndxHVar(hvar) );
+    JSON_Emit( "}" );
 }
 
 
 /****************************************************************************
 **
-*F  CompAssGVar( <stat> ) . . . . . . . . . . . . . . . . . . . .  T_ASS_GVAR
+*F  JSON_CompAssGVar( <stat> ) . . . . . . . . . . . . . . . . . . . .  T_ASS_GVAR
 */
-void CompAssGVar (
+void JSON_CompAssGVar (
     Stat                stat )
 {
     GVar                gvar;           /* global variable                 */
     CVar                rhs;            /* right hand side                 */
 
-    Emit( "{\"type\":\"assign\", \"subtype\":\"GVar\", ");
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"GVar\", ");
 
     /* emit the code for the assignment                                    */
     gvar = (GVar)(ADDR_STAT(stat)[0]);
-    CompSetUseGVar( gvar, COMP_USE_GVAR_ID );
-    Emit( "\"gvar\":\"%s\"", NameGVar(gvar));
-    Emit(", \"rightHandSide\":" );
+    JSON_CompSetUseGVar( gvar, COMP_USE_GVAR_ID );
+    JSON_Emit( "\"gvar\":\"%s\"", NameGVar(gvar));
+    JSON_Emit(", \"rightHandSide\":" );
 
     /* compile the right hand side expression                              */
-    rhs = CompExpr( ADDR_STAT(stat)[1] );
+    rhs = JSON_CompExpr( ADDR_STAT(stat)[1] );
 
-    Emit( "}\n" );
+    JSON_Emit( "}\n" );
 
     /* free the temporary                                                  */
-    if ( IS_TEMP_CVAR( rhs ) )  FreeTemp( TEMP_CVAR( rhs ) );
+    if ( IS_TEMP_CVAR( rhs ) )  JSON_FreeTemp( TEMP_CVAR( rhs ) );
 }
 
 
 /****************************************************************************
 **
-*F  CompUnbGVar( <stat> ) . . . . . . . . . . . . . . . . . . . .  T_UNB_GVAR
+*F  JSON_CompUnbGVar( <stat> ) . . . . . . . . . . . . . . . . . . . .  T_UNB_GVAR
 */
-void            CompUnbGVar (
+void            JSON_CompUnbGVar (
     Stat                stat )
 {
     GVar                gvar;           /* global variable                 */
 
-    Emit( "{\"type\":\"assign\", \"subtype\":\"UnbGVar\", " );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"UnbGVar\", " );
    // PrintStat( stat );
 
     /* emit the code for the assignment                                    */
     gvar = (GVar)(ADDR_STAT(stat)[0]);
-    Emit( "\"gvar\":\"%s\"", NameGVar(gvar));
-    CompSetUseGVar( gvar, COMP_USE_GVAR_ID );
-    //Emit( "AssGVar( G_%n, 0 );\n", NameGVar(gvar) );
+    JSON_Emit( "\"gvar\":\"%s\"", NameGVar(gvar));
+    JSON_CompSetUseGVar( gvar, COMP_USE_GVAR_ID );
+    //JSON_Emit( "AssGVar( G_%n, 0 );\n", NameGVar(gvar) );
     
-    Emit( "}" );
+    JSON_Emit( "}" );
 }
 
 
 /****************************************************************************
 **
-*F  CompAssList( <stat> ) . . . . . . . . . . . . . . . . . . . .  T_ASS_LIST
+*F  JSON_CompAssList( <stat> ) . . . . . . . . . . . . . . . . . . . .  T_ASS_LIST
 */
-void CompAssList (
+void JSON_CompAssList (
     Stat                stat )
 {
     CVar                list;           /* list                            */
@@ -4958,87 +4957,87 @@ void CompAssList (
     CVar                rhs;            /* right hand side                 */
 
     /* print a comment                                                     */
-        //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{\"type\":\"assign\", \"subtype\":\"list\", " );
+        //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"list\", " );
 
-    Emit("\"list\":");
+    JSON_Emit("\"list\":");
     /* compile the list expression                                         */
-    list = CompExpr( ADDR_STAT(stat)[0] );
+    list = JSON_CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", \"position\":");
+    JSON_Emit(", \"position\":");
     /* compile and check the position expression                           */
-    pos = CompExpr( ADDR_STAT(stat)[1] );
-    CompCheckIntPos( pos );
+    pos = JSON_CompExpr( ADDR_STAT(stat)[1] );
+    JSON_CompCheckIntPos( pos );
 
-    Emit(", \"rightHandSide\":");
+    JSON_Emit(", \"rightHandSide\":");
     /* compile the right hand side                                         */
-    rhs = CompExpr( ADDR_STAT(stat)[2] );
+    rhs = JSON_CompExpr( ADDR_STAT(stat)[2] );
 
     /* emit the code                                                       */
-    if ( CompFastPlainLists ) {
-        if ( HasInfoCVar( rhs, W_INT_SMALL ) ) {
-            //Emit( "C_ASS_LIST_FPL_INTOBJ( %c, %c, %c )\n", list, pos, rhs );
+    if ( JSON_CompFastPlainLists ) {
+        if ( JSON_HasInfoCVar( rhs, W_INT_SMALL ) ) {
+            //JSON_Emit( "C_ASS_LIST_FPL_INTOBJ( %c, %c, %c )\n", list, pos, rhs );
         }
         else {
-            //Emit( "C_ASS_LIST_FPL( %c, %c, %c )\n", list, pos, rhs );
+            //JSON_Emit( "C_ASS_LIST_FPL( %c, %c, %c )\n", list, pos, rhs );
         }
     }
     else {
-        //Emit( "C_ASS_LIST( %c, %c, %c );\n", list, pos, rhs );
+        //JSON_Emit( "C_ASS_LIST( %c, %c, %c );\n", list, pos, rhs );
     }
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( rhs  ) )  FreeTemp( TEMP_CVAR( rhs  ) );
-    if ( IS_TEMP_CVAR( pos  ) )  FreeTemp( TEMP_CVAR( pos  ) );
-    if ( IS_TEMP_CVAR( list ) )  FreeTemp( TEMP_CVAR( list ) );
+    if ( IS_TEMP_CVAR( rhs  ) )  JSON_FreeTemp( TEMP_CVAR( rhs  ) );
+    if ( IS_TEMP_CVAR( pos  ) )  JSON_FreeTemp( TEMP_CVAR( pos  ) );
+    if ( IS_TEMP_CVAR( list ) )  JSON_FreeTemp( TEMP_CVAR( list ) );
     
-    Emit( "}" );
+    JSON_Emit( "}" );
 }
 
 
 /****************************************************************************
 **
-*F  CompAsssList( <stat> )  . . . . . . . . . . . . . . . . . . . T_ASSS_LIST
+*F  JSON_CompAsssList( <stat> )  . . . . . . . . . . . . . . . . . . . T_ASSS_LIST
 */
-void CompAsssList (
+void JSON_CompAsssList (
     Stat                stat )
 {
     CVar                list;           /* list                            */
     CVar                poss;           /* positions                       */
     CVar                rhss;           /* right hand sides                */
 
-        //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{\"type\":\"assign\", \"subtype\":\"sList\", " );
+        //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"sList\", " );
     
-    Emit("\"list\":");
+    JSON_Emit("\"list\":");
     /* compile the list expression                                         */
-    list = CompExpr( ADDR_STAT(stat)[0] );
+    list = JSON_CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", \"position\":");
+    JSON_Emit(", \"position\":");
     /* compile and check the position expression                           */
-    poss = CompExpr( ADDR_STAT(stat)[1] );
+    poss = JSON_CompExpr( ADDR_STAT(stat)[1] );
 
-    Emit(", \"rightHandSide\":");
+    JSON_Emit(", \"rightHandSide\":");
     /* compile the right hand side                                         */
-    rhss = CompExpr( ADDR_STAT(stat)[2] );
+    rhss = JSON_CompExpr( ADDR_STAT(stat)[2] );
 
     /* emit the code                                                       */
-    //Emit( "AsssListCheck( %c, %c, %c );\n", list, poss, rhss );
+    //JSON_Emit( "AsssListCheck( %c, %c, %c );\n", list, poss, rhss );
 
-    Emit( "}" );
+    JSON_Emit( "}" );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( rhss ) )  FreeTemp( TEMP_CVAR( rhss ) );
-    if ( IS_TEMP_CVAR( poss ) )  FreeTemp( TEMP_CVAR( poss ) );
-    if ( IS_TEMP_CVAR( list ) )  FreeTemp( TEMP_CVAR( list ) );
+    if ( IS_TEMP_CVAR( rhss ) )  JSON_FreeTemp( TEMP_CVAR( rhss ) );
+    if ( IS_TEMP_CVAR( poss ) )  JSON_FreeTemp( TEMP_CVAR( poss ) );
+    if ( IS_TEMP_CVAR( list ) )  JSON_FreeTemp( TEMP_CVAR( list ) );
 }
 
 
 /****************************************************************************
 **
-*F  CompAssListLev( <stat> )  . . . . . . . . . . . . . . . .  T_ASS_LIST_LEV
+*F  JSON_CompAssListLev( <stat> )  . . . . . . . . . . . . . . . .  T_ASS_LIST_LEV
 */
-void CompAssListLev (
+void JSON_CompAssListLev (
     Stat                stat )
 {
     CVar                lists;          /* lists                           */
@@ -5046,42 +5045,42 @@ void CompAssListLev (
     CVar                rhss;           /* right hand sides                */
     Int                 level;          /* level                           */
 
-    //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{\"type\":\"assign\", \"subtype\":\"listLev\", " );
+    //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"listLev\", " );
 
-    Emit("\"list\":");
+    JSON_Emit("\"list\":");
     /* compile the list expressions                                        */
-    lists = CompExpr( ADDR_STAT(stat)[0] );
+    lists = JSON_CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", \"position\":");
+    JSON_Emit(", \"position\":");
     /* compile and check the position expression                           */
-    pos = CompExpr( ADDR_STAT(stat)[1] );
-    CompCheckIntSmallPos( pos );
+    pos = JSON_CompExpr( ADDR_STAT(stat)[1] );
+    JSON_CompCheckIntSmallPos( pos );
 
-    Emit(", \"rightHandSide\":");
+    JSON_Emit(", \"rightHandSide\":");
     /* compile the right hand sides                                        */
-    rhss = CompExpr( ADDR_STAT(stat)[2] );
+    rhss = JSON_CompExpr( ADDR_STAT(stat)[2] );
 
     /* get the level                                                       */
     level = (Int)(ADDR_STAT(stat)[3]);
-    Emit(", \"level\":%d", level);
+    JSON_Emit(", \"level\":%d", level);
 
-    Emit( "}" );
+    JSON_Emit( "}" );
     /* emit the code                                                       */
-    //Emit( "AssListLevel( %c, %c, %c, %d );\n", lists, pos, rhss, level );
+    //JSON_Emit( "AssListLevel( %c, %c, %c, %d );\n", lists, pos, rhss, level );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( rhss  ) )  FreeTemp( TEMP_CVAR( rhss  ) );
-    if ( IS_TEMP_CVAR( pos   ) )  FreeTemp( TEMP_CVAR( pos   ) );
-    if ( IS_TEMP_CVAR( lists ) )  FreeTemp( TEMP_CVAR( lists ) );
+    if ( IS_TEMP_CVAR( rhss  ) )  JSON_FreeTemp( TEMP_CVAR( rhss  ) );
+    if ( IS_TEMP_CVAR( pos   ) )  JSON_FreeTemp( TEMP_CVAR( pos   ) );
+    if ( IS_TEMP_CVAR( lists ) )  JSON_FreeTemp( TEMP_CVAR( lists ) );
 }
 
 
 /****************************************************************************
 **
-*F  CompAsssListLev( <stat> ) . . . . . . . . . . . . . . . . T_ASSS_LIST_LEV
+*F  JSON_CompAsssListLev( <stat> ) . . . . . . . . . . . . . . . . T_ASSS_LIST_LEV
 */
-void CompAsssListLev (
+void JSON_CompAsssListLev (
     Stat                stat )
 {
     CVar                lists;          /* list                            */
@@ -5089,554 +5088,554 @@ void CompAsssListLev (
     CVar                rhss;           /* right hand sides                */
     Int                 level;          /* level                           */
 
-    //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{\"type\":\"assign\", \"subtype\":\"sListLev\", " );
+    //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"sListLev\", " );
 
-    Emit("\"list\":");
+    JSON_Emit("\"list\":");
     /* compile the list expressions                                        */
-    lists = CompExpr( ADDR_STAT(stat)[0] );
+    lists = JSON_CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", \"position\":");
+    JSON_Emit(", \"position\":");
     /* compile and check the position expression                           */
-    poss = CompExpr( ADDR_STAT(stat)[1] );
+    poss = JSON_CompExpr( ADDR_STAT(stat)[1] );
 
-    Emit(", \"rightHandSide\":");
+    JSON_Emit(", \"rightHandSide\":");
     /* compile the right hand side                                         */
-    rhss = CompExpr( ADDR_STAT(stat)[2] );
+    rhss = JSON_CompExpr( ADDR_STAT(stat)[2] );
 
     /* get the level                                                       */
     level = (Int)(ADDR_STAT(stat)[3]);
-    Emit(", \"level\":%d", level);
+    JSON_Emit(", \"level\":%d", level);
 
     /* emit the code                                                       */
-    //Emit( "AsssListLevelCheck( %c, %c, %c, %d );\n",
+    //JSON_Emit( "AsssListLevelCheck( %c, %c, %c, %d );\n",
     //      lists, poss, rhss, level );
     
-    Emit( "}" );
+    JSON_Emit( "}" );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( rhss  ) )  FreeTemp( TEMP_CVAR( rhss ) );
-    if ( IS_TEMP_CVAR( poss  ) )  FreeTemp( TEMP_CVAR( poss ) );
-    if ( IS_TEMP_CVAR( lists ) )  FreeTemp( TEMP_CVAR( lists ) );
+    if ( IS_TEMP_CVAR( rhss  ) )  JSON_FreeTemp( TEMP_CVAR( rhss ) );
+    if ( IS_TEMP_CVAR( poss  ) )  JSON_FreeTemp( TEMP_CVAR( poss ) );
+    if ( IS_TEMP_CVAR( lists ) )  JSON_FreeTemp( TEMP_CVAR( lists ) );
 }
 
 
 /****************************************************************************
 **
-*F  CompUnbList( <stat> ) . . . . . . . . . . . . . . . . . . . .  T_UNB_LIST
+*F  JSON_CompUnbList( <stat> ) . . . . . . . . . . . . . . . . . . . .  T_UNB_LIST
 */
-void CompUnbList (
+void JSON_CompUnbList (
     Stat                stat )
 {
     CVar                list;           /* list, left operand              */
     CVar                pos;            /* position, left operand          */
 
-    //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{\"type\":\"assign\", \"subtype\":\"unbList\", " );
+    //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"unbList\", " );
 
-    Emit("\"list\":");
+    JSON_Emit("\"list\":");
     /* compile the list expression                                         */
-    list = CompExpr( ADDR_STAT(stat)[0] );
+    list = JSON_CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", \"position\":");
+    JSON_Emit(", \"position\":");
     /* compile and check the position expression                           */
-    pos = CompExpr( ADDR_STAT(stat)[1] );
-    CompCheckIntPos( pos );
+    pos = JSON_CompExpr( ADDR_STAT(stat)[1] );
+    JSON_CompCheckIntPos( pos );
 
     /* emit the code                                                       */
-    //Emit( "C_UNB_LIST( %c, %c );\n", list, pos );
+    //JSON_Emit( "C_UNB_LIST( %c, %c );\n", list, pos );
     
-    Emit( "}" );
+    JSON_Emit( "}" );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( pos  ) )  FreeTemp( TEMP_CVAR( pos  ) );
-    if ( IS_TEMP_CVAR( list ) )  FreeTemp( TEMP_CVAR( list ) );
+    if ( IS_TEMP_CVAR( pos  ) )  JSON_FreeTemp( TEMP_CVAR( pos  ) );
+    if ( IS_TEMP_CVAR( list ) )  JSON_FreeTemp( TEMP_CVAR( list ) );
 }
 
 
 /****************************************************************************
 **
-*F  CompAssRecName( <stat> )  . . . . . . . . . . . . . . . .  T_ASS_REC_NAME
+*F  JSON_CompAssRecName( <stat> )  . . . . . . . . . . . . . . . .  T_ASS_REC_NAME
 */
-void CompAssRecName (
+void JSON_CompAssRecName (
     Stat                stat )
 {
     CVar                record;         /* record, left operand            */
     UInt                rnam;           /* name, left operand              */
     CVar                rhs;            /* rhs, right operand              */
 
-    //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{\"type\":\"assign\", \"subtype\":\"recName\", " );
+    //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"recName\", " );
 
-    Emit("\"record\":");
+    JSON_Emit("\"record\":");
     /* compile the record expression                                       */
-    record = CompExpr( ADDR_STAT(stat)[0] );
+    record = JSON_CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", \"name\":");
+    JSON_Emit(", \"name\":");
     /* get the name (stored immediately in the statement)                  */
     rnam = (UInt)(ADDR_STAT(stat)[1]);
-    Emit("\"%s\"", NAME_RNAM(rnam));
-    //CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
+    JSON_Emit("\"%s\"", NAME_RNAM(rnam));
+    //JSON_CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
-    Emit(", \"rightHandSide\":");
+    JSON_Emit(", \"rightHandSide\":");
     /* compile the right hand side                                         */
-    rhs = CompExpr( ADDR_STAT(stat)[2] );
+    rhs = JSON_CompExpr( ADDR_STAT(stat)[2] );
 
-    Emit( "}" );
+    JSON_Emit( "}" );
 
     /* emit the code for the assignment                                    */
-    //Emit( "ASS_REC( %c, R_%n, %c );\n", record, NAME_RNAM(rnam), rhs );
+    //JSON_Emit( "ASS_REC( %c, R_%n, %c );\n", record, NAME_RNAM(rnam), rhs );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( rhs    ) )  FreeTemp( TEMP_CVAR( rhs    ) );
-    if ( IS_TEMP_CVAR( record ) )  FreeTemp( TEMP_CVAR( record ) );
+    if ( IS_TEMP_CVAR( rhs    ) )  JSON_FreeTemp( TEMP_CVAR( rhs    ) );
+    if ( IS_TEMP_CVAR( record ) )  JSON_FreeTemp( TEMP_CVAR( record ) );
 }
 
 
 /****************************************************************************
 **
-*F  CompAssRecExpr( <stat> )  . . . . . . . . . . . . . . . .  T_ASS_REC_EXPR
+*F  JSON_CompAssRecExpr( <stat> )  . . . . . . . . . . . . . . . .  T_ASS_REC_EXPR
 */
-void CompAssRecExpr (
+void JSON_CompAssRecExpr (
     Stat                stat )
 {
     CVar                record;         /* record, left operand            */
     CVar                rnam;           /* name, left operand              */
     CVar                rhs;            /* rhs, right operand              */
 
-    //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{\"type\":\"assign\", \"subtype\":\"recExpr\", " );
+    //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"recExpr\", " );
 
-    Emit("\"record\":");
+    JSON_Emit("\"record\":");
     /* compile the record expression                                       */
-    record = CompExpr( ADDR_STAT(stat)[0] );
+    record = JSON_CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", \"rnam\":");
+    JSON_Emit(", \"rnam\":");
     /* get the name (stored immediately in the statement)                  */
-    rnam = CompExpr( ADDR_STAT(stat)[1] );
+    rnam = JSON_CompExpr( ADDR_STAT(stat)[1] );
 
-    Emit(", \"rhs\":");
+    JSON_Emit(", \"rhs\":");
     /* compile the right hand side                                         */
-    rhs = CompExpr( ADDR_STAT(stat)[2] );
+    rhs = JSON_CompExpr( ADDR_STAT(stat)[2] );
 
-    Emit( "}" );
+    JSON_Emit( "}" );
 
     /* emit the code for the assignment                                    */
-    //Emit( "ASS_REC( %c, RNamObj(%c), %c );\n", record, rnam, rhs );
+    //JSON_Emit( "ASS_REC( %c, RNamObj(%c), %c );\n", record, rnam, rhs );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( rhs    ) )  FreeTemp( TEMP_CVAR( rhs    ) );
-    if ( IS_TEMP_CVAR( rnam   ) )  FreeTemp( TEMP_CVAR( rnam   ) );
-    if ( IS_TEMP_CVAR( record ) )  FreeTemp( TEMP_CVAR( record ) );
+    if ( IS_TEMP_CVAR( rhs    ) )  JSON_FreeTemp( TEMP_CVAR( rhs    ) );
+    if ( IS_TEMP_CVAR( rnam   ) )  JSON_FreeTemp( TEMP_CVAR( rnam   ) );
+    if ( IS_TEMP_CVAR( record ) )  JSON_FreeTemp( TEMP_CVAR( record ) );
 }
 
 
 /****************************************************************************
 **
-*F  CompUnbRecName( <stat> )  . . . . . . . . . . . . . . . .  T_UNB_REC_NAME
+*F  JSON_CompUnbRecName( <stat> )  . . . . . . . . . . . . . . . .  T_UNB_REC_NAME
 */
-void CompUnbRecName (
+void JSON_CompUnbRecName (
     Stat                stat )
 {
     CVar                record;         /* record, left operand            */
     UInt                rnam;           /* name, left operand              */
 
-    //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{\"type\":\"assign\", \"subtype\":\"UnbRecName\", " );
+    //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"UnbRecName\", " );
 
-    Emit("\"record\":");
+    JSON_Emit("\"record\":");
     /* compile the record expression                                       */
-    record = CompExpr( ADDR_STAT(stat)[0] );
+    record = JSON_CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", \"rnam\":");
+    JSON_Emit(", \"rnam\":");
     /* get the name (stored immediately in the statement)                  */
     rnam = (UInt)(ADDR_STAT(stat)[1]);
-    Emit("\"%s\"", NAME_RNAM(rnam));
-    CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
+    JSON_Emit("\"%s\"", NAME_RNAM(rnam));
+    JSON_CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
     /* emit the code for the assignment                                    */
-    //Emit( "UNB_REC( %c, R_%n );\n", record, NAME_RNAM(rnam) );
+    //JSON_Emit( "UNB_REC( %c, R_%n );\n", record, NAME_RNAM(rnam) );
 
-    Emit( "}" );
+    JSON_Emit( "}" );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( record ) )  FreeTemp( TEMP_CVAR( record ) );
+    if ( IS_TEMP_CVAR( record ) )  JSON_FreeTemp( TEMP_CVAR( record ) );
 }
 
 
 /****************************************************************************
 **
-*F  CompUnbRecExpr( <stat> )  . . . . . . . . . . . . . . . .  T_UNB_REC_EXPR
+*F  JSON_CompUnbRecExpr( <stat> )  . . . . . . . . . . . . . . . .  T_UNB_REC_EXPR
 */
-void            CompUnbRecExpr (
+void            JSON_CompUnbRecExpr (
     Stat                stat )
 {
     CVar                record;         /* record, left operand            */
     CVar                rnam;           /* name, left operand              */
 
-        //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{\"type\":\"assign\", \"subtype\":\"UnbRecExpr\", " );
+        //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"UnbRecExpr\", " );
 
 
-    Emit("\"record\":");
+    JSON_Emit("\"record\":");
     /* compile the record expression                                       */
-    record = CompExpr( ADDR_STAT(stat)[0] );
+    record = JSON_CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", \"rnam\":");
+    JSON_Emit(", \"rnam\":");
     /* get the name (stored immediately in the statement)                  */
-    rnam = CompExpr( ADDR_STAT(stat)[1] );
+    rnam = JSON_CompExpr( ADDR_STAT(stat)[1] );
 
     /* emit the code for the assignment                                    */
-    //Emit( "UNB_REC( %c, RNamObj(%c) );\n", record, rnam );
+    //JSON_Emit( "UNB_REC( %c, RNamObj(%c) );\n", record, rnam );
 
-    Emit( "}" );
+    JSON_Emit( "}" );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( rnam   ) )  FreeTemp( TEMP_CVAR( rnam   ) );
-    if ( IS_TEMP_CVAR( record ) )  FreeTemp( TEMP_CVAR( record ) );
+    if ( IS_TEMP_CVAR( rnam   ) )  JSON_FreeTemp( TEMP_CVAR( rnam   ) );
+    if ( IS_TEMP_CVAR( record ) )  JSON_FreeTemp( TEMP_CVAR( record ) );
 }
 
 
 /****************************************************************************
 **
-*F  CompAssPosObj( <stat> ) . . . . . . . . . . . . . . . . . .  T_ASS_POSOBJ
+*F  JSON_CompAssPosObj( <stat> ) . . . . . . . . . . . . . . . . . .  T_ASS_POSOBJ
 */
-void CompAssPosObj (
+void JSON_CompAssPosObj (
     Stat                stat )
 {
     CVar                list;           /* list                            */
     CVar                pos;            /* position                        */
     CVar                rhs;            /* right hand side                 */
 
-        //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{\"type\":\"assign\", \"subtype\":\"posObj\", " );
+        //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"posObj\", " );
 
-    Emit("\"list\":");
+    JSON_Emit("\"list\":");
     /* compile the list expression                                         */
-    list = CompExpr( ADDR_STAT(stat)[0] );
+    list = JSON_CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", \"pos\":");
+    JSON_Emit(", \"pos\":");
     /* compile and check the position expression                           */
-    pos = CompExpr( ADDR_STAT(stat)[1] );
-//    CompCheckIntSmallPos( pos );
+    pos = JSON_CompExpr( ADDR_STAT(stat)[1] );
+//    JSON_CompCheckIntSmallPos( pos );
 
-    Emit(", \"rightHandSide\":");
+    JSON_Emit(", \"rightHandSide\":");
     /* compile the right hand side                                         */
-    rhs = CompExpr( ADDR_STAT(stat)[2] );
+    rhs = JSON_CompExpr( ADDR_STAT(stat)[2] );
 
-    Emit( "}" );
+    JSON_Emit( "}" );
 
     /* emit the code                                                       */
-//    if ( HasInfoCVar( rhs, W_INT_SMALL ) ) {
-        //Emit( "C_ASS_POSOBJ_INTOBJ( %c, %i, %c )\n", list, pos, rhs );
+//    if ( JSON_HasInfoCVar( rhs, W_INT_SMALL ) ) {
+        //JSON_Emit( "C_ASS_POSOBJ_INTOBJ( %c, %i, %c )\n", list, pos, rhs );
 //    }
 //    else {
-        //Emit( "C_ASS_POSOBJ( %c, %i, %c )\n", list, pos, rhs );
+        //JSON_Emit( "C_ASS_POSOBJ( %c, %i, %c )\n", list, pos, rhs );
 //    }
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( rhs  ) )  FreeTemp( TEMP_CVAR( rhs  ) );
-    if ( IS_TEMP_CVAR( pos  ) )  FreeTemp( TEMP_CVAR( pos  ) );
-    if ( IS_TEMP_CVAR( list ) )  FreeTemp( TEMP_CVAR( list ) );
+    if ( IS_TEMP_CVAR( rhs  ) )  JSON_FreeTemp( TEMP_CVAR( rhs  ) );
+    if ( IS_TEMP_CVAR( pos  ) )  JSON_FreeTemp( TEMP_CVAR( pos  ) );
+    if ( IS_TEMP_CVAR( list ) )  JSON_FreeTemp( TEMP_CVAR( list ) );
 }
 
 
 
 /****************************************************************************
 **
-*F  CompAsssPosObj( <stat> )  . . . . . . . . . . . . . . . . . T_ASSS_POSOBJ
+*F  JSON_CompAsssPosObj( <stat> )  . . . . . . . . . . . . . . . . . T_ASSS_POSOBJ
 */
-void CompAsssPosObj (
+void JSON_CompAsssPosObj (
     Stat                stat )
 {
     CVar                list;           /* list                            */
     CVar                poss;           /* positions                       */
     CVar                rhss;           /* right hand sides                */
 
-    //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{\"type\":\"assign\", \"subtype\":\"sPosObj\", " );
+    //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"sPosObj\", " );
 
-    Emit("\"list\":");
+    JSON_Emit("\"list\":");
     /* compile the list expression                                         */
-    list = CompExpr( ADDR_STAT(stat)[0] );
+    list = JSON_CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", \"poss\":");
+    JSON_Emit(", \"poss\":");
     /* compile and check the position expression                           */
-    poss = CompExpr( ADDR_STAT(stat)[1] );
+    poss = JSON_CompExpr( ADDR_STAT(stat)[1] );
 
-    Emit(", \"rhss\":");
+    JSON_Emit(", \"rhss\":");
     /* compile the right hand side                                         */
-    rhss = CompExpr( ADDR_STAT(stat)[2] );
+    rhss = JSON_CompExpr( ADDR_STAT(stat)[2] );
 
-    Emit( "}" );
+    JSON_Emit( "}" );
 
     /* emit the code                                                       */
-    //Emit( "AsssPosObjCheck( %c, %c, %c );\n", list, poss, rhss );
+    //JSON_Emit( "AsssPosObjCheck( %c, %c, %c );\n", list, poss, rhss );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( rhss ) )  FreeTemp( TEMP_CVAR( rhss ) );
-    if ( IS_TEMP_CVAR( poss ) )  FreeTemp( TEMP_CVAR( poss ) );
-    if ( IS_TEMP_CVAR( list ) )  FreeTemp( TEMP_CVAR( list ) );
+    if ( IS_TEMP_CVAR( rhss ) )  JSON_FreeTemp( TEMP_CVAR( rhss ) );
+    if ( IS_TEMP_CVAR( poss ) )  JSON_FreeTemp( TEMP_CVAR( poss ) );
+    if ( IS_TEMP_CVAR( list ) )  JSON_FreeTemp( TEMP_CVAR( list ) );
 }
 
 
 /****************************************************************************
 **
-*F  CompAssPosObjLev( <stat> )  . . . . . . . . . . . . . .  T_ASS_POSOBJ_LEV
+*F  JSON_CompAssPosObjLev( <stat> )  . . . . . . . . . . . . . .  T_ASS_POSOBJ_LEV
 */
-void CompAssPosObjLev (
+void JSON_CompAssPosObjLev (
     Stat                stat )
 {
-    //Emit( "CANNOT COMPILE STATEMENT OF TNUM %d;\n", TNUM_STAT(stat) );
+    //JSON_Emit( "CANNOT COMPILE STATEMENT OF TNUM %d;\n", TNUM_STAT(stat) );
 }
 
 
 /****************************************************************************
 **
-*F  CompAsssPosObjLev( <stat> ) . . . . . . . . . . . . . . T_ASSS_POSOBJ_LEV
+*F  JSON_CompAsssPosObjLev( <stat> ) . . . . . . . . . . . . . . T_ASSS_POSOBJ_LEV
 */
-void CompAsssPosObjLev (
+void JSON_CompAsssPosObjLev (
     Stat                stat )
 {
-    //Emit( "CANNOT COMPILE STATEMENT OF TNUM %d;\n", TNUM_STAT(stat) );
+    //JSON_Emit( "CANNOT COMPILE STATEMENT OF TNUM %d;\n", TNUM_STAT(stat) );
 }
 
 
 /****************************************************************************
 **
-*F  CompUnbPosObj( <stat> ) . . . . . . . . . . . . . . . . . .  T_UNB_POSOBJ
+*F  JSON_CompUnbPosObj( <stat> ) . . . . . . . . . . . . . . . . . .  T_UNB_POSOBJ
 *
 u
 */
-void CompUnbPosObj (
+void JSON_CompUnbPosObj (
     Stat                stat )
 {
     CVar                list;           /* list, left operand              */
     CVar                pos;            /* position, left operand          */
 
-    //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{\"type\":\"UnbPosObj\", " );
+    //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( "{\"type\":\"UnbPosObj\", " );
 
-    Emit("\"list\":");
+    JSON_Emit("\"list\":");
     /* compile the list expression                                         */
-    list = CompExpr( ADDR_STAT(stat)[0] );
+    list = JSON_CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", \"pos\":");
+    JSON_Emit(", \"pos\":");
     /* compile and check the position expression                           */
-    pos = CompExpr( ADDR_STAT(stat)[1] );
-    CompCheckIntSmallPos( pos );
+    pos = JSON_CompExpr( ADDR_STAT(stat)[1] );
+    JSON_CompCheckIntSmallPos( pos );
 
-    Emit( "}" );
+    JSON_Emit( "}" );
 
     /* emit the code                                                       */
-    //Emit( "if ( TNUM_OBJ(%c) == T_POSOBJ ) {\n", list );
-    //Emit( "if ( %i <= SIZE_OBJ(%c)/sizeof(Obj)-1 ) {\n", pos, list );
-    //Emit( "SET_ELM_PLIST( %c, %i, 0 );\n", list, pos );
-    //Emit( "}\n}\n" );
-    //Emit( "else {\n" );
-    //Emit( "UNB_LIST( %c, %i );\n", list, pos );
-    //Emit( "}\n" );
+    //JSON_Emit( "if ( TNUM_OBJ(%c) == T_POSOBJ ) {\n", list );
+    //JSON_Emit( "if ( %i <= SIZE_OBJ(%c)/sizeof(Obj)-1 ) {\n", pos, list );
+    //JSON_Emit( "SET_ELM_PLIST( %c, %i, 0 );\n", list, pos );
+    //JSON_Emit( "}\n}\n" );
+    //JSON_Emit( "else {\n" );
+    //JSON_Emit( "UNB_LIST( %c, %i );\n", list, pos );
+    //JSON_Emit( "}\n" );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( pos  ) )  FreeTemp( TEMP_CVAR( pos  ) );
-    if ( IS_TEMP_CVAR( list ) )  FreeTemp( TEMP_CVAR( list ) );
+    if ( IS_TEMP_CVAR( pos  ) )  JSON_FreeTemp( TEMP_CVAR( pos  ) );
+    if ( IS_TEMP_CVAR( list ) )  JSON_FreeTemp( TEMP_CVAR( list ) );
 }
 
 
 /****************************************************************************
 **
-*F  CompAssComObjName( <stat> ) . . . . . . . . . . . . . . T_ASS_COMOBJ_NAME
+*F  JSON_CompAssComObjName( <stat> ) . . . . . . . . . . . . . . T_ASS_COMOBJ_NAME
 */
-void CompAssComObjName (
+void JSON_CompAssComObjName (
     Stat                stat )
 {
     CVar                record;         /* record, left operand            */
     UInt                rnam;           /* name, left operand              */
     CVar                rhs;            /* rhs, right operand              */
 
-    //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{\"type\":\"assign\", \"subtype\":\"ComObjName\", " );
+    //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"ComObjName\", " );
 
-    Emit("\"record\":");
+    JSON_Emit("\"record\":");
     /* compile the record expression                                       */
-    record = CompExpr( ADDR_STAT(stat)[0] );
+    record = JSON_CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", \"rnam\":");
+    JSON_Emit(", \"rnam\":");
     /* get the name (stored immediately in the statement)                  */
     rnam = (UInt)(ADDR_STAT(stat)[1]);
-    Emit("\"%s\"", NAME_RNAM(rnam));
-    CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
+    JSON_Emit("\"%s\"", NAME_RNAM(rnam));
+    JSON_CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
-    Emit(", \"rhs\":");
+    JSON_Emit(", \"rhs\":");
     /* compile the right hand side                                         */
-    rhs = CompExpr( ADDR_STAT(stat)[2] );
+    rhs = JSON_CompExpr( ADDR_STAT(stat)[2] );
 
-    Emit( "}" );
+    JSON_Emit( "}" );
 
     /* emit the code for the assignment                                    */
-    //Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
-    //Emit( "AssPRec( %c, R_%n, %c );\n", record, NAME_RNAM(rnam), rhs );
-    //Emit( "#ifdef HPCGAP\n" );
-    //Emit( "} else if ( TNUM_OBJ(%c) == T_ACOMOBJ ) {\n", record );
-    //Emit( "AssARecord( %c, R_%n, %c );\n", record, NAME_RNAM(rnam), rhs );
-    //Emit( "#endif\n" );
-    //Emit( "}\nelse {\n" );
-    //Emit( "ASS_REC( %c, R_%n, %c );\n", record, NAME_RNAM(rnam), rhs );
-    //Emit( "}\n" );
+    //JSON_Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
+    //JSON_Emit( "AssPRec( %c, R_%n, %c );\n", record, NAME_RNAM(rnam), rhs );
+    //JSON_Emit( "#ifdef HPCGAP\n" );
+    //JSON_Emit( "} else if ( TNUM_OBJ(%c) == T_ACOMOBJ ) {\n", record );
+    //JSON_Emit( "AssARecord( %c, R_%n, %c );\n", record, NAME_RNAM(rnam), rhs );
+    //JSON_Emit( "#endif\n" );
+    //JSON_Emit( "}\nelse {\n" );
+    //JSON_Emit( "ASS_REC( %c, R_%n, %c );\n", record, NAME_RNAM(rnam), rhs );
+    //JSON_Emit( "}\n" );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( rhs    ) )  FreeTemp( TEMP_CVAR( rhs    ) );
-    if ( IS_TEMP_CVAR( record ) )  FreeTemp( TEMP_CVAR( record ) );
+    if ( IS_TEMP_CVAR( rhs    ) )  JSON_FreeTemp( TEMP_CVAR( rhs    ) );
+    if ( IS_TEMP_CVAR( record ) )  JSON_FreeTemp( TEMP_CVAR( record ) );
 }
 
 
 /****************************************************************************
 **
-*F  CompAssComObjExpr( <stat> ) . . . . . . . . . . . . . . T_ASS_COMOBJ_EXPR
+*F  JSON_CompAssComObjExpr( <stat> ) . . . . . . . . . . . . . . T_ASS_COMOBJ_EXPR
 */
-void CompAssComObjExpr (
+void JSON_CompAssComObjExpr (
     Stat                stat )
 {
     CVar                record;         /* record, left operand            */
     CVar                rnam;           /* name, left operand              */
     CVar                rhs;            /* rhs, right operand              */
 
-    //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
+    //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
 
-    Emit( "{\"type\":\"assign\", \"subtype\":\"ComObjExpr\", " );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"ComObjExpr\", " );
 
-    Emit( "\"record\":" );
+    JSON_Emit( "\"record\":" );
     /* compile the record expression                                       */
-    record = CompExpr( ADDR_STAT(stat)[0] );
+    record = JSON_CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit( ", \"name\":" );
+    JSON_Emit( ", \"name\":" );
     /* get the name (stored immediately in the statement)                  */
-    rnam = CompExpr( ADDR_STAT(stat)[1] );
+    rnam = JSON_CompExpr( ADDR_STAT(stat)[1] );
 
-    Emit( ", \"rhs\":" );
+    JSON_Emit( ", \"rhs\":" );
     /* compile the right hand side                                         */
-    rhs = CompExpr( ADDR_STAT(stat)[2] );
+    rhs = JSON_CompExpr( ADDR_STAT(stat)[2] );
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code for the assignment                                    */
-    //Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
-    //Emit( "AssPRec( %c, RNamObj(%c), %c );\n", record, rnam, rhs );
-    //Emit( "#ifdef HPCGAP\n" );
-    //Emit( "} else if ( TNUM_OBJ(%c) == T_ACOMOBJ ) {\n", record );
-    //Emit( "AssARecord( %c, RNamObj(%c), %c );\n", record, rnam, rhs );
-    //Emit( "#endif\n" );
-    //Emit( "}\nelse {\n" );
-    //Emit( "ASS_REC( %c, RNamObj(%c), %c );\n", record, rnam, rhs );
-    //Emit( "}\n" );
+    //JSON_Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
+    //JSON_Emit( "AssPRec( %c, RNamObj(%c), %c );\n", record, rnam, rhs );
+    //JSON_Emit( "#ifdef HPCGAP\n" );
+    //JSON_Emit( "} else if ( TNUM_OBJ(%c) == T_ACOMOBJ ) {\n", record );
+    //JSON_Emit( "AssARecord( %c, RNamObj(%c), %c );\n", record, rnam, rhs );
+    //JSON_Emit( "#endif\n" );
+    //JSON_Emit( "}\nelse {\n" );
+    //JSON_Emit( "ASS_REC( %c, RNamObj(%c), %c );\n", record, rnam, rhs );
+    //JSON_Emit( "}\n" );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( rhs    ) )  FreeTemp( TEMP_CVAR( rhs    ) );
-    if ( IS_TEMP_CVAR( rnam   ) )  FreeTemp( TEMP_CVAR( rnam   ) );
-    if ( IS_TEMP_CVAR( record ) )  FreeTemp( TEMP_CVAR( record ) );
+    if ( IS_TEMP_CVAR( rhs    ) )  JSON_FreeTemp( TEMP_CVAR( rhs    ) );
+    if ( IS_TEMP_CVAR( rnam   ) )  JSON_FreeTemp( TEMP_CVAR( rnam   ) );
+    if ( IS_TEMP_CVAR( record ) )  JSON_FreeTemp( TEMP_CVAR( record ) );
 }
 
 
 /****************************************************************************
 **
-*F  CompUnbComObjName( <stat> ) . . . . . . . . . . . . . . T_UNB_COMOBJ_NAME
+*F  JSON_CompUnbComObjName( <stat> ) . . . . . . . . . . . . . . T_UNB_COMOBJ_NAME
 */
-void CompUnbComObjName (
+void JSON_CompUnbComObjName (
     Stat                stat )
 {
     CVar                record;         /* record, left operand            */
     UInt                rnam;           /* name, left operand              */
 
-    //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{\"type\":\"assign\", \"subtype\":\"UnbComObjName\", " );
+    //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"UnbComObjName\", " );
 
-    Emit("\"record\":");
+    JSON_Emit("\"record\":");
     /* compile the record expression                                       */
-    record = CompExpr( ADDR_STAT(stat)[0] );
+    record = JSON_CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", \"name\":");
+    JSON_Emit(", \"name\":");
     /* get the name (stored immediately in the statement)                  */
     rnam = (UInt)(ADDR_STAT(stat)[1]);
-    CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
+    JSON_CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
-    Emit("\"%s\"", NAME_RNAM(rnam));
+    JSON_Emit("\"%s\"", NAME_RNAM(rnam));
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code for the assignment                                    */
-    //Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
-    //Emit( "UnbPRec( %c, R_%n );\n", record, NAME_RNAM(rnam) );
-    //Emit( "#ifdef HPCGAP\n" );
-    //Emit( "} else if ( TNUM_OBJ(%c) == T_ACOMOBJ ) {\n", record );
-    //Emit( "UnbARecord( %c, R_%n );\n", record, NAME_RNAM(rnam) );
-    //Emit( "#endif\n" );
-    //Emit( "}\nelse {\n" );
-    //Emit( "UNB_REC( %c, R_%n );\n", record, NAME_RNAM(rnam) );
-    //Emit( "}\n" );
+    //JSON_Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
+    //JSON_Emit( "UnbPRec( %c, R_%n );\n", record, NAME_RNAM(rnam) );
+    //JSON_Emit( "#ifdef HPCGAP\n" );
+    //JSON_Emit( "} else if ( TNUM_OBJ(%c) == T_ACOMOBJ ) {\n", record );
+    //JSON_Emit( "UnbARecord( %c, R_%n );\n", record, NAME_RNAM(rnam) );
+    //JSON_Emit( "#endif\n" );
+    //JSON_Emit( "}\nelse {\n" );
+    //JSON_Emit( "UNB_REC( %c, R_%n );\n", record, NAME_RNAM(rnam) );
+    //JSON_Emit( "}\n" );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( record ) )  FreeTemp( TEMP_CVAR( record ) );
+    if ( IS_TEMP_CVAR( record ) )  JSON_FreeTemp( TEMP_CVAR( record ) );
 }
 
 
 /****************************************************************************
 **
-*F  CompUnbComObjExpr( <stat> ) . . . . . . . . . . . . . . T_UNB_COMOBJ_EXPR
+*F  JSON_CompUnbComObjExpr( <stat> ) . . . . . . . . . . . . . . T_UNB_COMOBJ_EXPR
 */
-void CompUnbComObjExpr (
+void JSON_CompUnbComObjExpr (
     Stat                stat )
 {
     CVar                record;         /* record, left operand            */
     UInt                rnam;           /* name, left operand              */
 
-    //Emit( "\n/* " ); PrintStat( stat ); //Emit( " */\n" );
-    Emit( "{\"type\":\"assign\", \"subtype\":\"UnbComObjExpr\", " );
+    //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
+    JSON_Emit( "{\"type\":\"assign\", \"subtype\":\"UnbComObjExpr\", " );
 
-    Emit("\"record\":");
+    JSON_Emit("\"record\":");
     /* compile the record expression                                       */
-    record = CompExpr( ADDR_STAT(stat)[0] );
+    record = JSON_CompExpr( ADDR_STAT(stat)[0] );
 
-    Emit(", \"name\":");
+    JSON_Emit(", \"name\":");
     /* get the name (stored immediately in the statement)                  */
-    rnam = CompExpr( ADDR_STAT(stat)[1] );
-    CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
+    rnam = JSON_CompExpr( ADDR_STAT(stat)[1] );
+    JSON_CompSetUseRNam( rnam, COMP_USE_RNAM_ID );
 
-    //Emit("\"%s\"", NAME_RNAM(rnam));
+    //JSON_Emit("\"%s\"", NAME_RNAM(rnam));
 
-    Emit("}");
+    JSON_Emit("}");
 
     /* emit the code for the assignment                                    */
-    //Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
-    //Emit( "UnbPRec( %c, RNamObj(%c) );\n", record, rnam );
-    //Emit( "#ifdef HPCGAP\n" );
-    //Emit( "} else if ( TNUM_OBJ(%c) == T_ACOMOBJ ) {\n", record );
-    //Emit( "UnbARecord( %c, RNamObj(%c) );\n", record, rnam );
-    //Emit( "#endif\n" );
-    //Emit( "}\nelse {\n" );
-    //Emit( "UNB_REC( %c, RNamObj(%c) );\n", record, rnam );
-    //Emit( "}\n" );
+    //JSON_Emit( "if ( TNUM_OBJ(%c) == T_COMOBJ ) {\n", record );
+    //JSON_Emit( "UnbPRec( %c, RNamObj(%c) );\n", record, rnam );
+    //JSON_Emit( "#ifdef HPCGAP\n" );
+    //JSON_Emit( "} else if ( TNUM_OBJ(%c) == T_ACOMOBJ ) {\n", record );
+    //JSON_Emit( "UnbARecord( %c, RNamObj(%c) );\n", record, rnam );
+    //JSON_Emit( "#endif\n" );
+    //JSON_Emit( "}\nelse {\n" );
+    //JSON_Emit( "UNB_REC( %c, RNamObj(%c) );\n", record, rnam );
+    //JSON_Emit( "}\n" );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( rnam   ) )  FreeTemp( TEMP_CVAR( rnam   ) );
-    if ( IS_TEMP_CVAR( record ) )  FreeTemp( TEMP_CVAR( record ) );
+    if ( IS_TEMP_CVAR( rnam   ) )  JSON_FreeTemp( TEMP_CVAR( rnam   ) );
+    if ( IS_TEMP_CVAR( record ) )  JSON_FreeTemp( TEMP_CVAR( record ) );
 }
 
 /****************************************************************************
 **
-*F  CompEmpty( <stat> )  . . . . . . . . . . . . . . . . . . . . . . . T_EMPY
+*F  JSON_CompEmpty( <stat> )  . . . . . . . . . . . . . . . . . . . . . . . T_EMPY
 */
-void CompEmpty (
+void JSON_CompEmpty (
     Stat                stat )
 {
-  //Emit("\n/* ; */\n");
-  Emit("{\"type\":\"empty\"}");
+  //JSON_Emit("\n/* ; */\n");
+  JSON_Emit("{\"type\":\"empty\"}");
 }
   
 /****************************************************************************
 **
-*F  CompInfo( <stat> )  . . . . . . . . . . . . . . . . . . . . . . .  T_INFO
+*F  JSON_CompInfo( <stat> )  . . . . . . . . . . . . . . . . . . . . . . .  T_INFO
 */
-void CompInfo (
+void JSON_CompInfo (
     Stat                stat )
 {
     CVar                tmp;
@@ -5647,93 +5646,93 @@ void CompInfo (
     Int                 i;
 
 
-    Emit("{\"type\":\"Info\", \"sel\":");
+    JSON_Emit("{\"type\":\"Info\", \"sel\":");
 
-    sel = CompExpr( ARGI_INFO( stat, 1 ) );
+    sel = JSON_CompExpr( ARGI_INFO( stat, 1 ) );
 
-    Emit(", \"lev\":");
+    JSON_Emit(", \"lev\":");
 
-    lev = CompExpr( ARGI_INFO( stat, 2 ) );
+    lev = JSON_CompExpr( ARGI_INFO( stat, 2 ) );
 
-    Emit(", \"args\":[");
+    JSON_Emit(", \"args\":[");
 
-    lst = CVAR_TEMP( NewTemp( "lst" ) );
-    tmp = CVAR_TEMP( NewTemp( "tmp" ) );
-    if ( IS_TEMP_CVAR( tmp ) )  FreeTemp( TEMP_CVAR( tmp ) );
+    lst = CVAR_TEMP( JSON_NewTemp( "lst" ) );
+    tmp = CVAR_TEMP( JSON_NewTemp( "tmp" ) );
+    if ( IS_TEMP_CVAR( tmp ) )  JSON_FreeTemp( TEMP_CVAR( tmp ) );
     narg = NARG_SIZE_INFO(SIZE_STAT(stat))-2;
     for ( i = 1;  i <= narg;  i++ ) {
-        tmp = CompExpr( ARGI_INFO( stat, i+2 ) );
+        tmp = JSON_CompExpr( ARGI_INFO( stat, i+2 ) );
         if( i < narg) {
-            Emit(",");
+            JSON_Emit(",");
         }
-        if ( IS_TEMP_CVAR( tmp ) )  FreeTemp( TEMP_CVAR( tmp ) );
+        if ( IS_TEMP_CVAR( tmp ) )  JSON_FreeTemp( TEMP_CVAR( tmp ) );
     }
 
-    Emit("]}");
+    JSON_Emit("]}");
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( lst ) )  FreeTemp( TEMP_CVAR( lst ) );
-    if ( IS_TEMP_CVAR( lev ) )  FreeTemp( TEMP_CVAR( lev ) );
-    if ( IS_TEMP_CVAR( sel ) )  FreeTemp( TEMP_CVAR( sel ) );
+    if ( IS_TEMP_CVAR( lst ) )  JSON_FreeTemp( TEMP_CVAR( lst ) );
+    if ( IS_TEMP_CVAR( lev ) )  JSON_FreeTemp( TEMP_CVAR( lev ) );
+    if ( IS_TEMP_CVAR( sel ) )  JSON_FreeTemp( TEMP_CVAR( sel ) );
 }
 
 
 /****************************************************************************
 **
-*F  CompAssert2( <stat> ) . . . . . . . . . . . . . . . . . .  T_ASSERT_2ARGS
+*F  JSON_CompAssert2( <stat> ) . . . . . . . . . . . . . . . . . .  T_ASSERT_2ARGS
 */
-void CompAssert2 (
+void JSON_CompAssert2 (
     Stat                stat )
 {
     CVar                lev;            /* the level                       */
     CVar                cnd;            /* the condition                   */
 
-    Emit("{\"type\":\"Assert\", \"subtype\":\"Assert2\", ");
-    Emit("\"level\":");
-    lev = CompExpr( ADDR_STAT(stat)[0] );
-    Emit(", \"condition\":");
-    cnd = CompBoolExpr( ADDR_STAT(stat)[1] );
-    Emit("}");
+    JSON_Emit("{\"type\":\"Assert\", \"subtype\":\"Assert2\", ");
+    JSON_Emit("\"level\":");
+    lev = JSON_CompExpr( ADDR_STAT(stat)[0] );
+    JSON_Emit(", \"condition\":");
+    cnd = JSON_CompBoolExpr( ADDR_STAT(stat)[1] );
+    JSON_Emit("}");
     
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( cnd ) )  FreeTemp( TEMP_CVAR( cnd ) );
-    if ( IS_TEMP_CVAR( lev ) )  FreeTemp( TEMP_CVAR( lev ) );
+    if ( IS_TEMP_CVAR( cnd ) )  JSON_FreeTemp( TEMP_CVAR( cnd ) );
+    if ( IS_TEMP_CVAR( lev ) )  JSON_FreeTemp( TEMP_CVAR( lev ) );
 }
 
 
 /****************************************************************************
 **
-*F  CompAssert3( <stat> ) . . . . . . . . . . . . . . . . . .  T_ASSERT_3ARGS
+*F  JSON_CompAssert3( <stat> ) . . . . . . . . . . . . . . . . . .  T_ASSERT_3ARGS
 */
-void CompAssert3 (
+void JSON_CompAssert3 (
     Stat                stat )
 {
     CVar                lev;            /* the level                       */
     CVar                cnd;            /* the condition                   */
     CVar                msg;            /* the message                     */
 
-    Emit("{\"type\":\"Assert\", \"subtype\":\"Assert3\", ");
-    Emit("\"level\":");
+    JSON_Emit("{\"type\":\"Assert\", \"subtype\":\"Assert3\", ");
+    JSON_Emit("\"level\":");
 
-    //Emit( "\n/* Assert( ... ); */\n" );
-    lev = CompExpr( ADDR_STAT(stat)[0] );
-    //Emit( "if ( ! LT(CurrentAssertionLevel, %c) ) {\n", lev );
-    Emit(", \"condition\":");
-    cnd = CompBoolExpr( ADDR_STAT(stat)[1] );
-    //Emit( "if ( ! %c ) {\n", cnd );
-    Emit(", \"message\":");
-    msg = CompExpr( ADDR_STAT(stat)[2] );
-    Emit("}");
-    //Emit( "if ( %c != (Obj)(UInt)0 )", msg );
-    //Emit( "{\n if ( IS_STRING_REP ( %c ) )\n", msg);
-    //Emit( "   PrintString1( %c);\n else\n   PrintObj(%c);\n}\n", msg, msg );
-    //Emit( "}\n" );
-    //Emit( "}\n" );
+    //JSON_Emit( "\n/* Assert( ... ); */\n" );
+    lev = JSON_CompExpr( ADDR_STAT(stat)[0] );
+    //JSON_Emit( "if ( ! LT(CurrentAssertionLevel, %c) ) {\n", lev );
+    JSON_Emit(", \"condition\":");
+    cnd = JSON_CompBoolExpr( ADDR_STAT(stat)[1] );
+    //JSON_Emit( "if ( ! %c ) {\n", cnd );
+    JSON_Emit(", \"message\":");
+    msg = JSON_CompExpr( ADDR_STAT(stat)[2] );
+    JSON_Emit("}");
+    //JSON_Emit( "if ( %c != (Obj)(UInt)0 )", msg );
+    //JSON_Emit( "{\n if ( IS_STRING_REP ( %c ) )\n", msg);
+    //JSON_Emit( "   PrintString1( %c);\n else\n   PrintObj(%c);\n}\n", msg, msg );
+    //JSON_Emit( "}\n" );
+    //JSON_Emit( "}\n" );
 
     /* free the temporaries                                                */
-    if ( IS_TEMP_CVAR( msg ) )  FreeTemp( TEMP_CVAR( msg ) );
-    if ( IS_TEMP_CVAR( cnd ) )  FreeTemp( TEMP_CVAR( cnd ) );
-    if ( IS_TEMP_CVAR( lev ) )  FreeTemp( TEMP_CVAR( lev ) );
+    if ( IS_TEMP_CVAR( msg ) )  JSON_FreeTemp( TEMP_CVAR( msg ) );
+    if ( IS_TEMP_CVAR( cnd ) )  JSON_FreeTemp( TEMP_CVAR( cnd ) );
+    if ( IS_TEMP_CVAR( lev ) )  JSON_FreeTemp( TEMP_CVAR( lev ) );
 }
 
 
@@ -5748,15 +5747,15 @@ void CompAssert3 (
 /****************************************************************************
 **
 
-*F  CompFunc( <func> )  . . . . . . . . . . . . . . . . .  compile a function
+*F  JSON_CompFunc( <func> )  . . . . . . . . . . . . . . . . .  compile a function
 **
-**  'CompFunc' compiles the function <func>, i.e., it emits  the code for the
+**  'JSON_CompFunc' compiles the function <func>, i.e., it emits  the code for the
 **  handler of the function <func> and the handlers of all its subfunctions.
 */
-Obj CompFunctions;
-Int CompFunctionsNr;
+Obj JSON_CompFunctions;
+Int JSON_CompFunctionsNr;
 
-void CompFunc (
+void JSON_CompFunc (
     Obj                 func )
 {
     Bag                 info;           /* info bag for this function      */
@@ -5773,19 +5772,19 @@ void CompFunc (
     }
     nloc = NLOC_FUNC(func);
 
-    Emit("{ \"type\":\"function\", \"param\":[");
+    JSON_Emit("{ \"type\":\"function\", \"param\":[");
   
     /* in the first pass allocate the info bag                             */
-    if ( CompPass == 1 ) {
-        CompFunctionsNr++;
-        GROW_PLIST(    CompFunctions, CompFunctionsNr );
-        SET_ELM_PLIST( CompFunctions, CompFunctionsNr, func );
-        SET_LEN_PLIST( CompFunctions, CompFunctionsNr );
-        CHANGED_BAG(   CompFunctions );
+    if ( JSON_CompPass == 1 ) {
+        JSON_CompFunctionsNr++;
+        GROW_PLIST(    JSON_CompFunctions, JSON_CompFunctionsNr );
+        SET_ELM_PLIST( JSON_CompFunctions, JSON_CompFunctionsNr, func );
+        SET_LEN_PLIST( JSON_CompFunctions, JSON_CompFunctionsNr );
+        CHANGED_BAG(   JSON_CompFunctions );
 
         info = NewBag( T_STRING, SIZE_INFO(narg+nloc,8) );
         NEXT_INFO(info)  = INFO_FEXP( CURR_FUNC );
-        NR_INFO(info)    = CompFunctionsNr;
+        NR_INFO(info)    = JSON_CompFunctionsNr;
         NLVAR_INFO(info) = narg + nloc;
         NHVAR_INFO(info) = 0;
         NTEMP_INFO(info) = 0;
@@ -5801,46 +5800,46 @@ void CompFunc (
     /* get the info bag                                                    */
     info = INFO_FEXP( CURR_FUNC );
     
-//    Int pass = CompPass;
-//    CompPass = 99;
+//    Int pass = JSON_CompPass;
+//    JSON_CompPass = 99;
 //    fexs = FEXS_FUNC(func);
 //    for ( i = 1;  i <= LEN_PLIST(fexs);  i++ ) {
-//        CompFunc( ELM_PLIST( fexs, i ) );
+//        JSON_CompFunc( ELM_PLIST( fexs, i ) );
 //    }
-//    CompPass = pass;
+//    JSON_CompPass = pass;
 
     for ( i = 1; i <= narg; i++ ) {
-        Emit("\"%s\"", NAME_LVAR(i));
+        JSON_Emit("\"%s\"", NAME_LVAR(i));
         if(i < narg) {
-          Emit(", ");
+          JSON_Emit(", ");
         }
     }
 
-    Emit("], \"body\":");
+    JSON_Emit("], \"body\":");
  
     /* compile the body                                                    */
-    CompStat( FIRST_STAT_CURR_FUNC );
+    JSON_CompStat( FIRST_STAT_CURR_FUNC );
 
     /* we know all the arguments have values                               */
     for ( i = 1; i <= narg; i++ ) {
-        SetInfoCVar( CVAR_LVAR(i), W_BOUND );
+        JSON_SetInfoCVar( CVAR_LVAR(i), W_BOUND );
     }
     for ( i = narg+1; i <= narg+nloc; i++ ) {
-        SetInfoCVar( CVAR_LVAR(i), W_UNBOUND );
+        JSON_SetInfoCVar( CVAR_LVAR(i), W_UNBOUND );
     }
     
     /* switch back to old frame                                            */
     SWITCH_TO_OLD_LVARS( oldFrame );
   
-    Emit("}");
+    JSON_Emit("}");
 }
 
 
 /****************************************************************************
 **
-*F  CompileFunc( <output>, <func>, <name> ) . . . compile
+*F  JSON_CompileFunc( <output>, <func>, <name> ) . . . compile
 */
-Int CompileFunc (
+Int JSON_CompileFunc (
     Char *              output,
     Obj                 func,
     Char *              name,
@@ -5867,26 +5866,26 @@ Int CompileFunc (
     SyNrCols = 255;
 
 
-    /* create 'CompInfoGVar' and 'CompInfoRNam'                            */
-    CompInfoGVar = NewBag( T_STRING, sizeof(UInt) * 1024 );
-    CompInfoRNam = NewBag( T_STRING, sizeof(UInt) * 1024 );
+    /* create 'JSON_CompInfoGVar' and 'JSON_CompInfoRNam'                            */
+    JSON_CompInfoGVar = NewBag( T_STRING, sizeof(UInt) * 1024 );
+    JSON_CompInfoRNam = NewBag( T_STRING, sizeof(UInt) * 1024 );
 
     /* create the list to collection the function expressions              */
-    CompFunctionsNr = 0;
-    CompFunctions = NEW_PLIST( T_PLIST, 8 );
-    SET_LEN_PLIST( CompFunctions, 0 );
+    JSON_CompFunctionsNr = 0;
+    JSON_CompFunctions = NEW_PLIST( T_PLIST, 8 );
+    SET_LEN_PLIST( JSON_CompFunctions, 0 );
 
     /* first collect information about variables                           */
-    CompPass = 1;
-    CompFunc( func );
+    JSON_CompPass = 1;
+    JSON_CompFunc( func );
 
     /* ok, lets emit some code now                                         */
-    CompPass = 2;
+    JSON_CompPass = 2;
 
     /********** create a JSON structure **********/
 
     /* now compile the handlers                                            */
-    CompFunc( func );
+    JSON_CompFunc( func );
 
     /* close the output file                                               */
     SyNrCols = col;
@@ -5895,15 +5894,15 @@ Int CompileFunc (
     fclose(json);
     
     /* return success                                                      */
-    return CompFunctionsNr;
+    return JSON_CompFunctionsNr;
 }
 
 
 /****************************************************************************
 **
-*F  FuncCOMPILE_FUNC( <self>, <output>, <func>, <name>, <magic1>, <magic2> )
+*F  JSON_FuncCOMPILE_FUNC( <self>, <output>, <func>, <name>, <magic1>, <magic2> )
 */
-Obj FuncCOMPILE_FUNC (
+Obj JSON_FuncCOMPILE_FUNC (
     Obj                 self,
     Obj                 arg )
 {
@@ -5929,7 +5928,7 @@ Obj FuncCOMPILE_FUNC (
     magic2 = ELM_LIST( arg, 5 );
     
     /* compile the function                                                */
-    nr = CompileFunc(
+    nr = JSON_CompileFunc(
         CHARS_STRING(output), func, CHARS_STRING(name),
         INT_INTOBJ(magic1), CHARS_STRING(magic2) );
 
@@ -5953,7 +5952,7 @@ Obj FuncCOMPILE_FUNC (
 static StructGVarFunc GVarFuncs [] = {
 
     { "JSON_COMPILE_FUNC", -1, "arg",
-      FuncCOMPILE_FUNC, "src/JSONcompiler.c:COMPILE_FUNC" },
+      JSON_FuncCOMPILE_FUNC, "src/JSONcompiler.c:JSON_COMPILE_FUNC" },
 
     { 0 }
 
@@ -5970,224 +5969,224 @@ static Int InitKernel (
 {
     Int                 i;              /* loop variable                   */
 
-    CompFastIntArith = 1;
-    CompFastListFuncs = 1;
-    CompFastPlainLists = 1;
-    CompCheckTypes = 1;
-    CompCheckListElements = 1;
-    CompCheckPosObjElements = 0;
-    CompPass = 0;
+    JSON_CompFastIntArith = 1;
+    JSON_CompFastListFuncs = 1;
+    JSON_CompFastPlainLists = 1;
+    JSON_CompCheckTypes = 1;
+    JSON_CompCheckListElements = 1;
+    JSON_CompCheckPosObjElements = 0;
+    JSON_CompPass = 0;
     
     /* init filters and functions                                          */
     InitHdlrFuncsFromTable( GVarFuncs );
 
     /* announce the global variables                                       */
-    InitGlobalBag( &CompInfoGVar,  "src/compiler.c:CompInfoGVar"  );
-    InitGlobalBag( &CompInfoRNam,  "src/compiler.c:CompInfoRNam"  );
-    InitGlobalBag( &CompFunctions, "src/compiler.c:CompFunctions" );
+    InitGlobalBag( &JSON_CompInfoGVar,  "src/compiler.c:JSON_CompInfoGVar"  );
+    InitGlobalBag( &JSON_CompInfoRNam,  "src/compiler.c:JSON_CompInfoRNam"  );
+    InitGlobalBag( &JSON_CompFunctions, "src/compiler.c:JSON_CompFunctions" );
 
     /* enter the expression compilers into the table                       */
     for ( i = 0; i < 256; i++ ) {
-        CompExprFuncs[ i ] = CompUnknownExpr;
+        JSON_CompExprFuncs[ i ] = JSON_CompUnknownExpr;
     }
 
-    CompExprFuncs[ T_FUNCCALL_0ARGS  ] = CompFunccall0to6Args;
-    CompExprFuncs[ T_FUNCCALL_1ARGS  ] = CompFunccall0to6Args;
-    CompExprFuncs[ T_FUNCCALL_2ARGS  ] = CompFunccall0to6Args;
-    CompExprFuncs[ T_FUNCCALL_3ARGS  ] = CompFunccall0to6Args;
-    CompExprFuncs[ T_FUNCCALL_4ARGS  ] = CompFunccall0to6Args;
-    CompExprFuncs[ T_FUNCCALL_5ARGS  ] = CompFunccall0to6Args;
-    CompExprFuncs[ T_FUNCCALL_6ARGS  ] = CompFunccall0to6Args;
-    CompExprFuncs[ T_FUNCCALL_XARGS  ] = CompFunccallXArgs;
-    CompExprFuncs[ T_FUNC_EXPR       ] = CompFuncExpr;
+    JSON_CompExprFuncs[ T_FUNCCALL_0ARGS  ] = JSON_CompFunccall0to6Args;
+    JSON_CompExprFuncs[ T_FUNCCALL_1ARGS  ] = JSON_CompFunccall0to6Args;
+    JSON_CompExprFuncs[ T_FUNCCALL_2ARGS  ] = JSON_CompFunccall0to6Args;
+    JSON_CompExprFuncs[ T_FUNCCALL_3ARGS  ] = JSON_CompFunccall0to6Args;
+    JSON_CompExprFuncs[ T_FUNCCALL_4ARGS  ] = JSON_CompFunccall0to6Args;
+    JSON_CompExprFuncs[ T_FUNCCALL_5ARGS  ] = JSON_CompFunccall0to6Args;
+    JSON_CompExprFuncs[ T_FUNCCALL_6ARGS  ] = JSON_CompFunccall0to6Args;
+    JSON_CompExprFuncs[ T_FUNCCALL_XARGS  ] = JSON_CompFunccallXArgs;
+    JSON_CompExprFuncs[ T_FUNC_EXPR       ] = JSON_CompFuncExpr;
 
-    CompExprFuncs[ T_OR              ] = CompOr;
-    CompExprFuncs[ T_AND             ] = CompAnd;
-    CompExprFuncs[ T_NOT             ] = CompNot;
-    CompExprFuncs[ T_EQ              ] = CompEq;
-    CompExprFuncs[ T_NE              ] = CompNe;
-    CompExprFuncs[ T_LT              ] = CompLt;
-    CompExprFuncs[ T_GE              ] = CompGe;
-    CompExprFuncs[ T_GT              ] = CompGt;
-    CompExprFuncs[ T_LE              ] = CompLe;
-    CompExprFuncs[ T_IN              ] = CompIn;
+    JSON_CompExprFuncs[ T_OR              ] = JSON_CompOr;
+    JSON_CompExprFuncs[ T_AND             ] = JSON_CompAnd;
+    JSON_CompExprFuncs[ T_NOT             ] = JSON_CompNot;
+    JSON_CompExprFuncs[ T_EQ              ] = JSON_CompEq;
+    JSON_CompExprFuncs[ T_NE              ] = JSON_CompNe;
+    JSON_CompExprFuncs[ T_LT              ] = JSON_CompLt;
+    JSON_CompExprFuncs[ T_GE              ] = JSON_CompGe;
+    JSON_CompExprFuncs[ T_GT              ] = JSON_CompGt;
+    JSON_CompExprFuncs[ T_LE              ] = JSON_CompLe;
+    JSON_CompExprFuncs[ T_IN              ] = JSON_CompIn;
 
-    CompExprFuncs[ T_SUM             ] = CompSum;
-    CompExprFuncs[ T_AINV            ] = CompAInv;
-    CompExprFuncs[ T_DIFF            ] = CompDiff;
-    CompExprFuncs[ T_PROD            ] = CompProd;
-    CompExprFuncs[ T_INV             ] = CompInv;
-    CompExprFuncs[ T_QUO             ] = CompQuo;
-    CompExprFuncs[ T_MOD             ] = CompMod;
-    CompExprFuncs[ T_POW             ] = CompPow;
+    JSON_CompExprFuncs[ T_SUM             ] = JSON_CompSum;
+    JSON_CompExprFuncs[ T_AINV            ] = JSON_CompAInv;
+    JSON_CompExprFuncs[ T_DIFF            ] = JSON_CompDiff;
+    JSON_CompExprFuncs[ T_PROD            ] = JSON_CompProd;
+    JSON_CompExprFuncs[ T_INV             ] = JSON_CompInv;
+    JSON_CompExprFuncs[ T_QUO             ] = JSON_CompQuo;
+    JSON_CompExprFuncs[ T_MOD             ] = JSON_CompMod;
+    JSON_CompExprFuncs[ T_POW             ] = JSON_CompPow;
 
-    CompExprFuncs[ T_INTEXPR         ] = CompIntExpr;
-    CompExprFuncs[ T_INT_EXPR        ] = CompIntExpr;
-    CompExprFuncs[ T_TRUE_EXPR       ] = CompTrueExpr;
-    CompExprFuncs[ T_FALSE_EXPR      ] = CompFalseExpr;
-    CompExprFuncs[ T_CHAR_EXPR       ] = CompCharExpr;
-    CompExprFuncs[ T_PERM_EXPR       ] = CompPermExpr;
-    CompExprFuncs[ T_PERM_CYCLE      ] = CompUnknownExpr;
-    CompExprFuncs[ T_LIST_EXPR       ] = CompListExpr;
-    CompExprFuncs[ T_LIST_TILD_EXPR  ] = CompListTildeExpr;
-    CompExprFuncs[ T_RANGE_EXPR      ] = CompRangeExpr;
-    CompExprFuncs[ T_STRING_EXPR     ] = CompStringExpr;
-    CompExprFuncs[ T_REC_EXPR        ] = CompRecExpr;
-    CompExprFuncs[ T_REC_TILD_EXPR   ] = CompRecTildeExpr;
+    JSON_CompExprFuncs[ T_INTEXPR         ] = JSON_CompIntExpr;
+    JSON_CompExprFuncs[ T_INT_EXPR        ] = JSON_CompIntExpr;
+    JSON_CompExprFuncs[ T_TRUE_EXPR       ] = JSON_CompTrueExpr;
+    JSON_CompExprFuncs[ T_FALSE_EXPR      ] = JSON_CompFalseExpr;
+    JSON_CompExprFuncs[ T_CHAR_EXPR       ] = JSON_CompCharExpr;
+    JSON_CompExprFuncs[ T_PERM_EXPR       ] = JSON_CompPermExpr;
+    JSON_CompExprFuncs[ T_PERM_CYCLE      ] = JSON_CompUnknownExpr;
+    JSON_CompExprFuncs[ T_LIST_EXPR       ] = JSON_CompListExpr;
+    JSON_CompExprFuncs[ T_LIST_TILD_EXPR  ] = JSON_CompListTildeExpr;
+    JSON_CompExprFuncs[ T_RANGE_EXPR      ] = JSON_CompRangeExpr;
+    JSON_CompExprFuncs[ T_STRING_EXPR     ] = JSON_CompStringExpr;
+    JSON_CompExprFuncs[ T_REC_EXPR        ] = JSON_CompRecExpr;
+    JSON_CompExprFuncs[ T_REC_TILD_EXPR   ] = JSON_CompRecTildeExpr;
 
-    CompExprFuncs[ T_REFLVAR         ] = CompRefLVar;
-    CompExprFuncs[ T_REF_LVAR        ] = CompRefLVar;
-    CompExprFuncs[ T_REF_LVAR_01     ] = CompRefLVar;
-    CompExprFuncs[ T_REF_LVAR_02     ] = CompRefLVar;
-    CompExprFuncs[ T_REF_LVAR_03     ] = CompRefLVar;
-    CompExprFuncs[ T_REF_LVAR_04     ] = CompRefLVar;
-    CompExprFuncs[ T_REF_LVAR_05     ] = CompRefLVar;
-    CompExprFuncs[ T_REF_LVAR_06     ] = CompRefLVar;
-    CompExprFuncs[ T_REF_LVAR_07     ] = CompRefLVar;
-    CompExprFuncs[ T_REF_LVAR_08     ] = CompRefLVar;
-    CompExprFuncs[ T_REF_LVAR_09     ] = CompRefLVar;
-    CompExprFuncs[ T_REF_LVAR_10     ] = CompRefLVar;
-    CompExprFuncs[ T_REF_LVAR_11     ] = CompRefLVar;
-    CompExprFuncs[ T_REF_LVAR_12     ] = CompRefLVar;
-    CompExprFuncs[ T_REF_LVAR_13     ] = CompRefLVar;
-    CompExprFuncs[ T_REF_LVAR_14     ] = CompRefLVar;
-    CompExprFuncs[ T_REF_LVAR_15     ] = CompRefLVar;
-    CompExprFuncs[ T_REF_LVAR_16     ] = CompRefLVar;
-    CompExprFuncs[ T_ISB_LVAR        ] = CompIsbLVar;
-    CompExprFuncs[ T_REF_HVAR        ] = CompRefHVar;
-    CompExprFuncs[ T_ISB_HVAR        ] = CompIsbHVar;
-    CompExprFuncs[ T_REF_GVAR        ] = CompRefGVar;
-    CompExprFuncs[ T_ISB_GVAR        ] = CompIsbGVar;
+    JSON_CompExprFuncs[ T_REFLVAR         ] = JSON_CompRefLVar;
+    JSON_CompExprFuncs[ T_REF_LVAR        ] = JSON_CompRefLVar;
+    JSON_CompExprFuncs[ T_REF_LVAR_01     ] = JSON_CompRefLVar;
+    JSON_CompExprFuncs[ T_REF_LVAR_02     ] = JSON_CompRefLVar;
+    JSON_CompExprFuncs[ T_REF_LVAR_03     ] = JSON_CompRefLVar;
+    JSON_CompExprFuncs[ T_REF_LVAR_04     ] = JSON_CompRefLVar;
+    JSON_CompExprFuncs[ T_REF_LVAR_05     ] = JSON_CompRefLVar;
+    JSON_CompExprFuncs[ T_REF_LVAR_06     ] = JSON_CompRefLVar;
+    JSON_CompExprFuncs[ T_REF_LVAR_07     ] = JSON_CompRefLVar;
+    JSON_CompExprFuncs[ T_REF_LVAR_08     ] = JSON_CompRefLVar;
+    JSON_CompExprFuncs[ T_REF_LVAR_09     ] = JSON_CompRefLVar;
+    JSON_CompExprFuncs[ T_REF_LVAR_10     ] = JSON_CompRefLVar;
+    JSON_CompExprFuncs[ T_REF_LVAR_11     ] = JSON_CompRefLVar;
+    JSON_CompExprFuncs[ T_REF_LVAR_12     ] = JSON_CompRefLVar;
+    JSON_CompExprFuncs[ T_REF_LVAR_13     ] = JSON_CompRefLVar;
+    JSON_CompExprFuncs[ T_REF_LVAR_14     ] = JSON_CompRefLVar;
+    JSON_CompExprFuncs[ T_REF_LVAR_15     ] = JSON_CompRefLVar;
+    JSON_CompExprFuncs[ T_REF_LVAR_16     ] = JSON_CompRefLVar;
+    JSON_CompExprFuncs[ T_ISB_LVAR        ] = JSON_CompIsbLVar;
+    JSON_CompExprFuncs[ T_REF_HVAR        ] = JSON_CompRefHVar;
+    JSON_CompExprFuncs[ T_ISB_HVAR        ] = JSON_CompIsbHVar;
+    JSON_CompExprFuncs[ T_REF_GVAR        ] = JSON_CompRefGVar;
+    JSON_CompExprFuncs[ T_ISB_GVAR        ] = JSON_CompIsbGVar;
 
-    CompExprFuncs[ T_ELM_LIST        ] = CompElmList;
-    CompExprFuncs[ T_ELMS_LIST       ] = CompElmsList;
-    CompExprFuncs[ T_ELM_LIST_LEV    ] = CompElmListLev;
-    CompExprFuncs[ T_ELMS_LIST_LEV   ] = CompElmsListLev;
-    CompExprFuncs[ T_ISB_LIST        ] = CompIsbList;
-    CompExprFuncs[ T_ELM_REC_NAME    ] = CompElmRecName;
-    CompExprFuncs[ T_ELM_REC_EXPR    ] = CompElmRecExpr;
-    CompExprFuncs[ T_ISB_REC_NAME    ] = CompIsbRecName;
-    CompExprFuncs[ T_ISB_REC_EXPR    ] = CompIsbRecExpr;
+    JSON_CompExprFuncs[ T_ELM_LIST        ] = JSON_CompElmList;
+    JSON_CompExprFuncs[ T_ELMS_LIST       ] = JSON_CompElmsList;
+    JSON_CompExprFuncs[ T_ELM_LIST_LEV    ] = JSON_CompElmListLev;
+    JSON_CompExprFuncs[ T_ELMS_LIST_LEV   ] = JSON_CompElmsListLev;
+    JSON_CompExprFuncs[ T_ISB_LIST        ] = JSON_CompIsbList;
+    JSON_CompExprFuncs[ T_ELM_REC_NAME    ] = JSON_CompElmRecName;
+    JSON_CompExprFuncs[ T_ELM_REC_EXPR    ] = JSON_CompElmRecExpr;
+    JSON_CompExprFuncs[ T_ISB_REC_NAME    ] = JSON_CompIsbRecName;
+    JSON_CompExprFuncs[ T_ISB_REC_EXPR    ] = JSON_CompIsbRecExpr;
 
-    CompExprFuncs[ T_ELM_POSOBJ      ] = CompElmPosObj;
-    CompExprFuncs[ T_ELMS_POSOBJ     ] = CompElmsPosObj;
-    CompExprFuncs[ T_ELM_POSOBJ_LEV  ] = CompElmPosObjLev;
-    CompExprFuncs[ T_ELMS_POSOBJ_LEV ] = CompElmsPosObjLev;
-    CompExprFuncs[ T_ISB_POSOBJ      ] = CompIsbPosObj;
-    CompExprFuncs[ T_ELM_COMOBJ_NAME ] = CompElmComObjName;
-    CompExprFuncs[ T_ELM_COMOBJ_EXPR ] = CompElmComObjExpr;
-    CompExprFuncs[ T_ISB_COMOBJ_NAME ] = CompIsbComObjName;
-    CompExprFuncs[ T_ISB_COMOBJ_EXPR ] = CompIsbComObjExpr;
+    JSON_CompExprFuncs[ T_ELM_POSOBJ      ] = JSON_CompElmPosObj;
+    JSON_CompExprFuncs[ T_ELMS_POSOBJ     ] = JSON_CompElmsPosObj;
+    JSON_CompExprFuncs[ T_ELM_POSOBJ_LEV  ] = JSON_CompElmPosObjLev;
+    JSON_CompExprFuncs[ T_ELMS_POSOBJ_LEV ] = JSON_CompElmsPosObjLev;
+    JSON_CompExprFuncs[ T_ISB_POSOBJ      ] = JSON_CompIsbPosObj;
+    JSON_CompExprFuncs[ T_ELM_COMOBJ_NAME ] = JSON_CompElmComObjName;
+    JSON_CompExprFuncs[ T_ELM_COMOBJ_EXPR ] = JSON_CompElmComObjExpr;
+    JSON_CompExprFuncs[ T_ISB_COMOBJ_NAME ] = JSON_CompIsbComObjName;
+    JSON_CompExprFuncs[ T_ISB_COMOBJ_EXPR ] = JSON_CompIsbComObjExpr;
 
-    CompExprFuncs[ T_FUNCCALL_OPTS   ] = CompFunccallOpts;
+    JSON_CompExprFuncs[ T_FUNCCALL_OPTS   ] = JSON_CompFunccallOpts;
     
     /* enter the boolean expression compilers into the table               */
     for ( i = 0; i < 256; i++ ) {
-        CompBoolExprFuncs[ i ] = CompUnknownBool;
+        JSON_CompBoolExprFuncs[ i ] = JSON_CompUnknownBool;
     }
 
-    CompBoolExprFuncs[ T_OR              ] = CompOrBool;
-    CompBoolExprFuncs[ T_AND             ] = CompAndBool;
-    CompBoolExprFuncs[ T_NOT             ] = CompNotBool;
-    CompBoolExprFuncs[ T_EQ              ] = CompEqBool;
-    CompBoolExprFuncs[ T_NE              ] = CompNeBool;
-    CompBoolExprFuncs[ T_LT              ] = CompLtBool;
-    CompBoolExprFuncs[ T_GE              ] = CompGeBool;
-    CompBoolExprFuncs[ T_GT              ] = CompGtBool;
-    CompBoolExprFuncs[ T_LE              ] = CompLeBool;
-    CompBoolExprFuncs[ T_IN              ] = CompInBool;
+    JSON_CompBoolExprFuncs[ T_OR              ] = JSON_CompOrBool;
+    JSON_CompBoolExprFuncs[ T_AND             ] = JSON_CompAndBool;
+    JSON_CompBoolExprFuncs[ T_NOT             ] = JSON_CompNotBool;
+    JSON_CompBoolExprFuncs[ T_EQ              ] = JSON_CompEqBool;
+    JSON_CompBoolExprFuncs[ T_NE              ] = JSON_CompNeBool;
+    JSON_CompBoolExprFuncs[ T_LT              ] = JSON_CompLtBool;
+    JSON_CompBoolExprFuncs[ T_GE              ] = JSON_CompGeBool;
+    JSON_CompBoolExprFuncs[ T_GT              ] = JSON_CompGtBool;
+    JSON_CompBoolExprFuncs[ T_LE              ] = JSON_CompLeBool;
+    JSON_CompBoolExprFuncs[ T_IN              ] = JSON_CompInBool;
 
     /* enter the statement compilers into the table                        */
     for ( i = 0; i < 256; i++ ) {
-        CompStatFuncs[ i ] = CompUnknownStat;
+        JSON_CompStatFuncs[ i ] = JSON_CompUnknownStat;
     }
 
-    CompStatFuncs[ T_PROCCALL_0ARGS  ] = CompProccall0to6Args;
-    CompStatFuncs[ T_PROCCALL_1ARGS  ] = CompProccall0to6Args;
-    CompStatFuncs[ T_PROCCALL_2ARGS  ] = CompProccall0to6Args;
-    CompStatFuncs[ T_PROCCALL_3ARGS  ] = CompProccall0to6Args;
-    CompStatFuncs[ T_PROCCALL_4ARGS  ] = CompProccall0to6Args;
-    CompStatFuncs[ T_PROCCALL_5ARGS  ] = CompProccall0to6Args;
-    CompStatFuncs[ T_PROCCALL_6ARGS  ] = CompProccall0to6Args;
-    CompStatFuncs[ T_PROCCALL_XARGS  ] = CompProccallXArgs;
+    JSON_CompStatFuncs[ T_PROCCALL_0ARGS  ] = JSON_CompProccall0to6Args;
+    JSON_CompStatFuncs[ T_PROCCALL_1ARGS  ] = JSON_CompProccall0to6Args;
+    JSON_CompStatFuncs[ T_PROCCALL_2ARGS  ] = JSON_CompProccall0to6Args;
+    JSON_CompStatFuncs[ T_PROCCALL_3ARGS  ] = JSON_CompProccall0to6Args;
+    JSON_CompStatFuncs[ T_PROCCALL_4ARGS  ] = JSON_CompProccall0to6Args;
+    JSON_CompStatFuncs[ T_PROCCALL_5ARGS  ] = JSON_CompProccall0to6Args;
+    JSON_CompStatFuncs[ T_PROCCALL_6ARGS  ] = JSON_CompProccall0to6Args;
+    JSON_CompStatFuncs[ T_PROCCALL_XARGS  ] = JSON_CompProccallXArgs;
 
-    CompStatFuncs[ T_SEQ_STAT        ] = CompSeqStat;
-    CompStatFuncs[ T_SEQ_STAT2       ] = CompSeqStat;
-    CompStatFuncs[ T_SEQ_STAT3       ] = CompSeqStat;
-    CompStatFuncs[ T_SEQ_STAT4       ] = CompSeqStat;
-    CompStatFuncs[ T_SEQ_STAT5       ] = CompSeqStat;
-    CompStatFuncs[ T_SEQ_STAT6       ] = CompSeqStat;
-    CompStatFuncs[ T_SEQ_STAT7       ] = CompSeqStat;
-    CompStatFuncs[ T_IF              ] = CompIf;
-    CompStatFuncs[ T_IF_ELSE         ] = CompIf;
-    CompStatFuncs[ T_IF_ELIF         ] = CompIf;
-    CompStatFuncs[ T_IF_ELIF_ELSE    ] = CompIf;
-    CompStatFuncs[ T_FOR             ] = CompFor;
-    CompStatFuncs[ T_FOR2            ] = CompFor;
-    CompStatFuncs[ T_FOR3            ] = CompFor;
-    CompStatFuncs[ T_FOR_RANGE       ] = CompFor;
-    CompStatFuncs[ T_FOR_RANGE2      ] = CompFor;
-    CompStatFuncs[ T_FOR_RANGE3      ] = CompFor;
-    CompStatFuncs[ T_WHILE           ] = CompWhile;
-    CompStatFuncs[ T_WHILE2          ] = CompWhile;
-    CompStatFuncs[ T_WHILE3          ] = CompWhile;
-    CompStatFuncs[ T_REPEAT          ] = CompRepeat;
-    CompStatFuncs[ T_REPEAT2         ] = CompRepeat;
-    CompStatFuncs[ T_REPEAT3         ] = CompRepeat;
-    CompStatFuncs[ T_BREAK           ] = CompBreak;
-    CompStatFuncs[ T_CONTINUE        ] = CompContinue;
-    CompStatFuncs[ T_RETURN_OBJ      ] = CompReturnObj;
-    CompStatFuncs[ T_RETURN_VOID     ] = CompReturnVoid;
+    JSON_CompStatFuncs[ T_SEQ_STAT        ] = JSON_CompSeqStat;
+    JSON_CompStatFuncs[ T_SEQ_STAT2       ] = JSON_CompSeqStat;
+    JSON_CompStatFuncs[ T_SEQ_STAT3       ] = JSON_CompSeqStat;
+    JSON_CompStatFuncs[ T_SEQ_STAT4       ] = JSON_CompSeqStat;
+    JSON_CompStatFuncs[ T_SEQ_STAT5       ] = JSON_CompSeqStat;
+    JSON_CompStatFuncs[ T_SEQ_STAT6       ] = JSON_CompSeqStat;
+    JSON_CompStatFuncs[ T_SEQ_STAT7       ] = JSON_CompSeqStat;
+    JSON_CompStatFuncs[ T_IF              ] = JSON_CompIf;
+    JSON_CompStatFuncs[ T_IF_ELSE         ] = JSON_CompIf;
+    JSON_CompStatFuncs[ T_IF_ELIF         ] = JSON_CompIf;
+    JSON_CompStatFuncs[ T_IF_ELIF_ELSE    ] = JSON_CompIf;
+    JSON_CompStatFuncs[ T_FOR             ] = JSON_CompFor;
+    JSON_CompStatFuncs[ T_FOR2            ] = JSON_CompFor;
+    JSON_CompStatFuncs[ T_FOR3            ] = JSON_CompFor;
+    JSON_CompStatFuncs[ T_FOR_RANGE       ] = JSON_CompFor;
+    JSON_CompStatFuncs[ T_FOR_RANGE2      ] = JSON_CompFor;
+    JSON_CompStatFuncs[ T_FOR_RANGE3      ] = JSON_CompFor;
+    JSON_CompStatFuncs[ T_WHILE           ] = JSON_CompWhile;
+    JSON_CompStatFuncs[ T_WHILE2          ] = JSON_CompWhile;
+    JSON_CompStatFuncs[ T_WHILE3          ] = JSON_CompWhile;
+    JSON_CompStatFuncs[ T_REPEAT          ] = JSON_CompRepeat;
+    JSON_CompStatFuncs[ T_REPEAT2         ] = JSON_CompRepeat;
+    JSON_CompStatFuncs[ T_REPEAT3         ] = JSON_CompRepeat;
+    JSON_CompStatFuncs[ T_BREAK           ] = JSON_CompBreak;
+    JSON_CompStatFuncs[ T_CONTINUE        ] = JSON_CompContinue;
+    JSON_CompStatFuncs[ T_RETURN_OBJ      ] = JSON_CompReturnObj;
+    JSON_CompStatFuncs[ T_RETURN_VOID     ] = JSON_CompReturnVoid;
 
-    CompStatFuncs[ T_ASS_LVAR        ] = CompAssLVar;
-    CompStatFuncs[ T_ASS_LVAR_01     ] = CompAssLVar;
-    CompStatFuncs[ T_ASS_LVAR_02     ] = CompAssLVar;
-    CompStatFuncs[ T_ASS_LVAR_03     ] = CompAssLVar;
-    CompStatFuncs[ T_ASS_LVAR_04     ] = CompAssLVar;
-    CompStatFuncs[ T_ASS_LVAR_05     ] = CompAssLVar;
-    CompStatFuncs[ T_ASS_LVAR_06     ] = CompAssLVar;
-    CompStatFuncs[ T_ASS_LVAR_07     ] = CompAssLVar;
-    CompStatFuncs[ T_ASS_LVAR_08     ] = CompAssLVar;
-    CompStatFuncs[ T_ASS_LVAR_09     ] = CompAssLVar;
-    CompStatFuncs[ T_ASS_LVAR_10     ] = CompAssLVar;
-    CompStatFuncs[ T_ASS_LVAR_11     ] = CompAssLVar;
-    CompStatFuncs[ T_ASS_LVAR_12     ] = CompAssLVar;
-    CompStatFuncs[ T_ASS_LVAR_13     ] = CompAssLVar;
-    CompStatFuncs[ T_ASS_LVAR_14     ] = CompAssLVar;
-    CompStatFuncs[ T_ASS_LVAR_15     ] = CompAssLVar;
-    CompStatFuncs[ T_ASS_LVAR_16     ] = CompAssLVar;
-    CompStatFuncs[ T_UNB_LVAR        ] = CompUnbLVar;
-    CompStatFuncs[ T_ASS_HVAR        ] = CompAssHVar;
-    CompStatFuncs[ T_UNB_HVAR        ] = CompUnbHVar;
-    CompStatFuncs[ T_ASS_GVAR        ] = CompAssGVar;
-    CompStatFuncs[ T_UNB_GVAR        ] = CompUnbGVar;
+    JSON_CompStatFuncs[ T_ASS_LVAR        ] = JSON_CompAssLVar;
+    JSON_CompStatFuncs[ T_ASS_LVAR_01     ] = JSON_CompAssLVar;
+    JSON_CompStatFuncs[ T_ASS_LVAR_02     ] = JSON_CompAssLVar;
+    JSON_CompStatFuncs[ T_ASS_LVAR_03     ] = JSON_CompAssLVar;
+    JSON_CompStatFuncs[ T_ASS_LVAR_04     ] = JSON_CompAssLVar;
+    JSON_CompStatFuncs[ T_ASS_LVAR_05     ] = JSON_CompAssLVar;
+    JSON_CompStatFuncs[ T_ASS_LVAR_06     ] = JSON_CompAssLVar;
+    JSON_CompStatFuncs[ T_ASS_LVAR_07     ] = JSON_CompAssLVar;
+    JSON_CompStatFuncs[ T_ASS_LVAR_08     ] = JSON_CompAssLVar;
+    JSON_CompStatFuncs[ T_ASS_LVAR_09     ] = JSON_CompAssLVar;
+    JSON_CompStatFuncs[ T_ASS_LVAR_10     ] = JSON_CompAssLVar;
+    JSON_CompStatFuncs[ T_ASS_LVAR_11     ] = JSON_CompAssLVar;
+    JSON_CompStatFuncs[ T_ASS_LVAR_12     ] = JSON_CompAssLVar;
+    JSON_CompStatFuncs[ T_ASS_LVAR_13     ] = JSON_CompAssLVar;
+    JSON_CompStatFuncs[ T_ASS_LVAR_14     ] = JSON_CompAssLVar;
+    JSON_CompStatFuncs[ T_ASS_LVAR_15     ] = JSON_CompAssLVar;
+    JSON_CompStatFuncs[ T_ASS_LVAR_16     ] = JSON_CompAssLVar;
+    JSON_CompStatFuncs[ T_UNB_LVAR        ] = JSON_CompUnbLVar;
+    JSON_CompStatFuncs[ T_ASS_HVAR        ] = JSON_CompAssHVar;
+    JSON_CompStatFuncs[ T_UNB_HVAR        ] = JSON_CompUnbHVar;
+    JSON_CompStatFuncs[ T_ASS_GVAR        ] = JSON_CompAssGVar;
+    JSON_CompStatFuncs[ T_UNB_GVAR        ] = JSON_CompUnbGVar;
 
-    CompStatFuncs[ T_ASS_LIST        ] = CompAssList;
-    CompStatFuncs[ T_ASSS_LIST       ] = CompAsssList;
-    CompStatFuncs[ T_ASS_LIST_LEV    ] = CompAssListLev;
-    CompStatFuncs[ T_ASSS_LIST_LEV   ] = CompAsssListLev;
-    CompStatFuncs[ T_UNB_LIST        ] = CompUnbList;
-    CompStatFuncs[ T_ASS_REC_NAME    ] = CompAssRecName;
-    CompStatFuncs[ T_ASS_REC_EXPR    ] = CompAssRecExpr;
-    CompStatFuncs[ T_UNB_REC_NAME    ] = CompUnbRecName;
-    CompStatFuncs[ T_UNB_REC_EXPR    ] = CompUnbRecExpr;
+    JSON_CompStatFuncs[ T_ASS_LIST        ] = JSON_CompAssList;
+    JSON_CompStatFuncs[ T_ASSS_LIST       ] = JSON_CompAsssList;
+    JSON_CompStatFuncs[ T_ASS_LIST_LEV    ] = JSON_CompAssListLev;
+    JSON_CompStatFuncs[ T_ASSS_LIST_LEV   ] = JSON_CompAsssListLev;
+    JSON_CompStatFuncs[ T_UNB_LIST        ] = JSON_CompUnbList;
+    JSON_CompStatFuncs[ T_ASS_REC_NAME    ] = JSON_CompAssRecName;
+    JSON_CompStatFuncs[ T_ASS_REC_EXPR    ] = JSON_CompAssRecExpr;
+    JSON_CompStatFuncs[ T_UNB_REC_NAME    ] = JSON_CompUnbRecName;
+    JSON_CompStatFuncs[ T_UNB_REC_EXPR    ] = JSON_CompUnbRecExpr;
 
-    CompStatFuncs[ T_ASS_POSOBJ      ] = CompAssPosObj;
-    CompStatFuncs[ T_ASSS_POSOBJ     ] = CompAsssPosObj;
-    CompStatFuncs[ T_ASS_POSOBJ_LEV  ] = CompAssPosObjLev;
-    CompStatFuncs[ T_ASSS_POSOBJ_LEV ] = CompAsssPosObjLev;
-    CompStatFuncs[ T_UNB_POSOBJ      ] = CompUnbPosObj;
-    CompStatFuncs[ T_ASS_COMOBJ_NAME ] = CompAssComObjName;
-    CompStatFuncs[ T_ASS_COMOBJ_EXPR ] = CompAssComObjExpr;
-    CompStatFuncs[ T_UNB_COMOBJ_NAME ] = CompUnbComObjName;
-    CompStatFuncs[ T_UNB_COMOBJ_EXPR ] = CompUnbComObjExpr;
+    JSON_CompStatFuncs[ T_ASS_POSOBJ      ] = JSON_CompAssPosObj;
+    JSON_CompStatFuncs[ T_ASSS_POSOBJ     ] = JSON_CompAsssPosObj;
+    JSON_CompStatFuncs[ T_ASS_POSOBJ_LEV  ] = JSON_CompAssPosObjLev;
+    JSON_CompStatFuncs[ T_ASSS_POSOBJ_LEV ] = JSON_CompAsssPosObjLev;
+    JSON_CompStatFuncs[ T_UNB_POSOBJ      ] = JSON_CompUnbPosObj;
+    JSON_CompStatFuncs[ T_ASS_COMOBJ_NAME ] = JSON_CompAssComObjName;
+    JSON_CompStatFuncs[ T_ASS_COMOBJ_EXPR ] = JSON_CompAssComObjExpr;
+    JSON_CompStatFuncs[ T_UNB_COMOBJ_NAME ] = JSON_CompUnbComObjName;
+    JSON_CompStatFuncs[ T_UNB_COMOBJ_EXPR ] = JSON_CompUnbComObjExpr;
 
-    CompStatFuncs[ T_INFO            ] = CompInfo;
-    CompStatFuncs[ T_ASSERT_2ARGS    ] = CompAssert2;
-    CompStatFuncs[ T_ASSERT_3ARGS    ] = CompAssert3;
-    CompStatFuncs[ T_EMPTY           ] = CompEmpty;
+    JSON_CompStatFuncs[ T_INFO            ] = JSON_CompInfo;
+    JSON_CompStatFuncs[ T_ASSERT_2ARGS    ] = JSON_CompAssert2;
+    JSON_CompStatFuncs[ T_ASSERT_3ARGS    ] = JSON_CompAssert3;
+    JSON_CompStatFuncs[ T_EMPTY           ] = JSON_CompEmpty;
 
-    CompStatFuncs[ T_PROCCALL_OPTS   ] = CompProccallOpts;
+    JSON_CompStatFuncs[ T_PROCCALL_OPTS   ] = JSON_CompProccallOpts;
     /* return success                                                      */
     return 0;
 }
@@ -6226,7 +6225,7 @@ static Int InitLibrary (
 
 /****************************************************************************
 **
-*F  InitInfoCompiler() . . . . . . . . . . . . . . .  table of init functions
+*F  InitInfoJSON_Compiler() . . . . . . . . . . . . . . .  table of init functions
 */
 static StructInitInfo module = {
     MODULE_BUILTIN,                     /* type                           */
@@ -6243,7 +6242,7 @@ static StructInitInfo module = {
     PostRestore                         /* postRestore                    */
 };
 
-StructInitInfo * InitInfoCompiler ( void )
+StructInitInfo * InitInfoJSON_Compiler ( void )
 {
     return &module;
 }

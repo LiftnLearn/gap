@@ -304,6 +304,48 @@ CompileFunc := function( arg )
 
 end;
 
+#############################################################################
+##
+#F  JSON_CompileFunc( <output>, <function>, <module_name>, ... )
+##
+##  <output> must be a filename,
+##  <function> the function to compile,
+##  <module_name> the name used in the compiled module
+##
+##  optional parameters are:
+##  "Magic1"
+##  "Magic2"
+##  "FastIntArith"
+##  "FastPlainLists"
+##  "CheckTypes"
+##  "CheckListElements"
+##  "CheckPosObjElements"
+##
+JSON_CompileFunc := function( arg )
+    local   output,  func,  name,  arguments;
+
+    output := arg[1];
+    func   := arg[2];
+    name   := arg[3];
+
+    arguments := rec(
+        magic1              := "integer/0",
+        magic2              := "string",
+        fastintarith        := "switch/true",
+        fastplainlists      := "switch/true",
+        checktypes          := "switch/true",
+        checklistelements   := "switch/true",
+        checkposobjelements := "switch/true" );
+
+    arguments := ParseArguments( arguments, arg, 4 );
+
+    return JSON_COMPILE_FUNC(
+        output, func, name,
+        arguments.magic1, arguments.magic2, arguments.fastintarith,
+        arguments.fastplainlists, arguments.checktypes,
+        arguments.checklistelements, arguments.checkposobjelements );
+
+end;
 
 #############################################################################
 ##
