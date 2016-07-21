@@ -5917,7 +5917,7 @@ Obj JSON_FuncCOMPILE_FUNC (
     /* unravel the arguments                                               */
     len = LEN_LIST(arg); 
     if ( len < 5 ) {
-        ErrorQuit( "usage: COMPILE_FUNC( <output>, <func>, <name>, %s",
+        ErrorQuit( "usage: JSON_COMPILE_FUNC( <output>, <func>, <name>, %s",
                    (Int)"<magic1>, <magic2>, ... )", 0 );
         return 0;
     }
@@ -5952,7 +5952,7 @@ Obj JSON_FuncCOMPILE_FUNC (
 static StructGVarFunc GVarFuncs [] = {
 
     { "JSON_COMPILE_FUNC", -1, "arg",
-      JSON_FuncCOMPILE_FUNC, "src/JSONcompiler.c:JSON_COMPILE_FUNC" },
+      JSON_FuncCOMPILE_FUNC, "src/JSON_compiler.c:JSON_COMPILE_FUNC" },
 
     { 0 }
 
@@ -6229,7 +6229,7 @@ static Int InitLibrary (
 */
 static StructInitInfo module = {
     MODULE_BUILTIN,                     /* type                           */
-    "compiler",                         /* name                           */
+    "JSON_compiler",                         /* name                           */
     0,                                  /* revision entry of c file       */
     0,                                  /* revision entry of h file       */
     0,                                  /* version                        */
@@ -6251,6 +6251,6 @@ StructInitInfo * InitInfoJSON_Compiler ( void )
 /****************************************************************************
 **
 
-*E  compiler.c  . . . . . . . . . . . . . . . . . . . . . . . . . . ends here
+*E  JSON_compiler.c  . . . . . . . . . . . . . . . . . . . . . . . . . . ends here
 */
 

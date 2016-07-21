@@ -86,6 +86,7 @@
 #include        "intrprtr.h"            /* interpreter                     */
 
 #include        "compiler.h"            /* compiler                        */
+#include        "JSON_compiler.h"       /* JSON compiler                   */
 
 #include        "compstat.h"            /* statically linked modules       */
 
@@ -3383,6 +3384,7 @@ static InitInfoFunc InitFuncsBuiltinModules[] = {
     InitInfoOpers,
     InitInfoIntrprtr,
     InitInfoCompiler,
+    InitInfoJSON_Compiler,
 
     /* arithmetic operations                                               */
     InitInfoAriths,

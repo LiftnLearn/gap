@@ -40,9 +40,9 @@ extern void JSON_SetCompileOpts( Char *opts );
 /****************************************************************************
 **
 
-*F  JSON_InitInfoCompiler() . . . . . . . . . . . . . . .  table of init functions
+*F  InitInfoCompiler() . . . . . . . . . . . . . . .  table of init functions
 */
-StructInitInfo * JSON_InitInfoCompiler ( void );
+StructInitInfo * InitInfoJSON_Compiler ( void );
 
 
 #endif // GAP_JSON_COMPILER_H
@@ -50,5 +50,5 @@ StructInitInfo * JSON_InitInfoCompiler ( void );
 /****************************************************************************
 **
 
-*E  compiler.h  . . . . . . . . . . . . . . . . . . . . . . . . . . ends here
+*E  JSON_compiler.h  . . . . . . . . . . . . . . . . . . . . . . . . . . ends here
 */
