@@ -1194,12 +1194,10 @@ CVar JSON_CompFuncExpr (
 
     Obj                 fexs;           /* function expressions list       */
     Obj                 fexp;           /* function expression             */
-    Int                 nr;             /* number of the function          */
 
     /* get the number of the function                                      */
     fexs = FEXS_FUNC( CURR_FUNC );
     fexp = ELM_PLIST( fexs, ((Int*)ADDR_EXPR(expr))[0] );
-    nr   = NR_INFO( INFO_FEXP( fexp ) );
 
     JSON_CompFunc( fexp );
 
@@ -1328,8 +1326,10 @@ CVar JSON_CompAnd (
     CVar                val;            /* result                          */
     CVar                left;           /* left operand                    */
     CVar                right1;         /* right operand 1                 */
-    CVar                right2 = 0;         /* right operand 2                 */
+    CVar                right2;         /* right operand 2                 */
     Bag                 only_left;      /* info after evaluating only left */
+
+    right2 = 0;
 
     /* allocate a temporary for the result                                 */
     val = CVAR_TEMP( JSON_NewTemp( "val" ) );
@@ -2775,10 +2775,6 @@ CVar JSON_CompListExpr1 (
     Expr                expr )
 {
     CVar                list;           /* list, result                    */
-    Int                 len;            /* logical length of the list      */
-
-    /* get the length of the list                                          */
-    len = SIZE_EXPR( expr ) / sizeof(Expr);
 
     /* allocate a temporary for the list                                   */
     list = CVAR_TEMP( JSON_NewTemp( "list" ) );
@@ -3012,10 +3008,6 @@ CVar JSON_CompRecExpr1 (
     Expr                expr )
 {
     CVar                rec;            /* record value, result            */
-    Int                 len;            /* number of components            */
-
-    /* get the number of components                                        */
-    len = SIZE_EXPR( expr ) / (2*sizeof(Expr));
 
     /* allocate a new temporary for the record                             */
     rec = CVAR_TEMP( JSON_NewTemp( "rec" ) );
@@ -4737,7 +4729,7 @@ void JSON_CompReturnObj (
     CVar                obj;            /* returned object                 */
 
         //JSON_Emit( "\n/* " ); PrintStat( stat ); //JSON_Emit( " */\n" );
-    JSON_Emit( " {\"return\":" ); 
+    JSON_Emit( " { \"type\":\"return\", \"void\":false, \"return\":" ); 
 
     /* compile the expression                                              */
     obj = JSON_CompExpr( ADDR_STAT(stat)[0] );
@@ -4763,7 +4755,7 @@ void JSON_CompReturnObj (
 void JSON_CompReturnVoid (
     Stat                stat )
 {
-    JSON_Emit("{ \"type\":\"return\", \"void\":\"true\"}");
+    JSON_Emit("{ \"type\":\"return\", \"void\":true}");
 }
 
 
