@@ -3503,7 +3503,7 @@ CVar JSON_CompIsbList (
     CVar                list;           /* list                            */
     CVar                pos;            /* position                        */
 
-    JSON_Emit("{ \"type\":\"JSON_CompIsbList\", \"list\":");
+    JSON_Emit("{ \"type\":\"CompIsbList\", \"list\":");
 
     /* allocate a new temporary for the result                             */
     isb = CVAR_TEMP( JSON_NewTemp( "isb" ) );
@@ -3544,7 +3544,7 @@ CVar JSON_CompElmRecName (
     CVar                record;         /* the record, left operand        */
     UInt                rnam;           /* the name, right operand         */
 
-    JSON_Emit("{ \"type\":\"JSON_CompElmRecName\", \"record\":");
+    JSON_Emit("{ \"type\":\"CompElmRecName\", \"record\":");
 
     /* allocate a new temporary for the element                            */
     elm = CVAR_TEMP( JSON_NewTemp( "elm" ) );
@@ -3586,7 +3586,7 @@ CVar JSON_CompElmRecExpr (
     CVar                record;         /* the record, left operand        */
     CVar                rnam;           /* the name, right operand         */
 
-    JSON_Emit("{ \"type\":\"JSON_CompElmRecExpr\", \"record\":");
+    JSON_Emit("{ \"type\":\"CompElmRecExpr\", \"record\":");
 
     /* allocate a new temporary for the element                            */
     elm = CVAR_TEMP( JSON_NewTemp( "elm" ) );
@@ -3627,7 +3627,7 @@ CVar JSON_CompIsbRecName (
     CVar                record;         /* the record, left operand        */
     UInt                rnam;           /* the name, right operand         */
 
-    JSON_Emit("{ \"type\":\"JSON_CompIsbRecName\", \"record\":");
+    JSON_Emit("{ \"type\":\"CompIsbRecName\", \"record\":");
 
     /* allocate a new temporary for the result                             */
     isb = CVAR_TEMP( JSON_NewTemp( "isb" ) );
@@ -3670,7 +3670,7 @@ CVar JSON_CompIsbRecExpr (
     CVar                record;         /* the record, left operand        */
     CVar                rnam;           /* the name, right operand         */
 
-    JSON_Emit("{\"type\":\"JSON_CompIsbRecExpr\", \"record\":");
+    JSON_Emit("{\"type\":\"CompIsbRecExpr\", \"record\":");
 
     /* allocate a new temporary for the result                             */
     isb = CVAR_TEMP( JSON_NewTemp( "isb" ) );
@@ -3712,7 +3712,7 @@ CVar JSON_CompElmPosObj (
     CVar                list;           /* list                            */
     CVar                pos;            /* position                        */
 
-    JSON_Emit("{\"type\":\"getListElement\", \"compiledIn\":\"JSON_CompElmPosObj\""
+    JSON_Emit("{\"type\":\"getListElement\", \"compiledIn\":\"CompElmPosObj\""
          ", \"list\":"
     );
 
@@ -3789,7 +3789,7 @@ CVar JSON_CompIsbPosObj (
     CVar                list;           /* list                            */
     CVar                pos;            /* position                        */
 
-    JSON_Emit("{ \"type\":\"JSON_CompIsbPosObj\", \"list\":");
+    JSON_Emit("{ \"type\":\"CompIsbPosObj\", \"list\":");
 
     /* allocate a new temporary for the result                             */
     isb = CVAR_TEMP( JSON_NewTemp( "isb" ) );
@@ -3891,7 +3891,7 @@ CVar JSON_CompElmComObjExpr (
     CVar                record;         /* the record, left operand        */
     CVar                rnam;           /* the name, right operand         */
 
-    JSON_Emit("{ \"type\":\"JSON_CompElmComObjExpr\", ");
+    JSON_Emit("{ \"type\":\"CompElmComObjExpr\", ");
 
     /* allocate a new temporary for the element                            */
     elm = CVAR_TEMP( JSON_NewTemp( "elm" ) );
@@ -3942,7 +3942,7 @@ CVar JSON_CompIsbComObjName (
     CVar                record;         /* the record, left operand        */
     UInt                rnam;           /* the name, right operand         */
 
-    JSON_Emit("{\"type\":\"JSON_CompIsbComObjName\", \"record\":");
+    JSON_Emit("{\"type\":\"CompIsbComObjName\", \"record\":");
 
     /* allocate a new temporary for the result                             */
     isb = CVAR_TEMP( JSON_NewTemp( "isb" ) );
@@ -3995,7 +3995,7 @@ CVar JSON_CompIsbComObjExpr (
     CVar                record;         /* the record, left operand        */
     UInt                rnam;           /* the name, right operand         */
 
-    JSON_Emit("{ \"type\":\"JSON_CompIsbComObjExpr\", \"record\":");
+    JSON_Emit("{ \"type\":\"CompIsbComObjExpr\", \"record\":");
 
     /* allocate a new temporary for the result                             */
     isb = CVAR_TEMP( JSON_NewTemp( "isb" ) );
