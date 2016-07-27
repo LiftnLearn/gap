@@ -62,4 +62,4 @@ function(operationName, filters)
     return []; #no return type, has only side effects
 end;
 
-Print(determineMethodOutputType(PrintObj, [IsAdditiveMagma]));
+#Print(determineMethodOutputType(PrintObj, [IsAdditiveMagma]));
