@@ -4,7 +4,12 @@ handleExpr :=
 function(expr, variableMapping)
     local argTypes, arg;
     Print(expr, "\n --------------------- \n");
-    if(IsBound(expr.type) and expr.type = "functionCall" 
+
+    if(IsList(expr)) then
+        return [IsList];
+    elif(IsBool(expr) or (IsBound(expr.type) and expr.type = "BoolExpr")) then
+        return [IsBool];
+    elif(IsBound(expr.type) and expr.type = "functionCall" 
     and IsBound(expr.name)) then
         if(IsBoundGlobal(Concatenation("MitM_", expr.name.identifier))) then
             #function containing objectify -> get output filter
@@ -23,11 +28,10 @@ function(expr, variableMapping)
         if(expr.subtype = "LVar") then 
             return variableMapping.(expr.identifier);
         elif(expr.subtype = "GVar") then
-            #how to handle this
-            return [IsObject];
+            #TODO: this gives redundant filters, is there some way to give only
+            #basic ones? -> unwrap from back until whole list found
+            return NamesFilter(TRUES_FLAGS(TypeObj(expr.name.identifier)![2]));
         fi;
-    elif(IsBound(expr.type)) then
-        return [expr.type];
     else
         return [IsObject];
     fi;
@@ -46,16 +50,20 @@ function(stat, variableMapping)
          #this would actually be a procedure call, but shouldn't matter
          ;#TODO: function containing objectify -> get output filter
     elif(IsBound(stat.stat.type) and stat.stat.type = "assign") then
-        variableMapping.(stat.stat.left) :=
-          handleExpr(stat.stat.right, variableMapping);
+        if(stat.stat.subtype = "LVar") then
+            variableMapping.(stat.stat.left) :=
+              handleExpr(stat.stat.right, variableMapping);
+        fi;
     elif(IsBound(stat.stat.type) and stat.stat.type = "functionCall") then
         ;
     elif(IsBound(stat.stat.type) and stat.stat.type = "return") then
-        if(stat.stat.void) then type := [];
-        else type := handleExpr(stat.stat.("return"), variableMapping);
+        if(stat.stat.void) then
+            type := [];
+        else
+            type := handleExpr(stat.stat.("return"), variableMapping);
         fi;
     else #cases that are not taken care of
-        Print("unknown type");
+        Print("unknown type \n");
         #Print(stat);
     fi;
 
@@ -66,11 +74,11 @@ end;
 #go over each line of the compiled function,
 #for every operation call recursively apply this
 determineMethodOutputType :=
-function(operationName, filters)
-    local func, tempFileName, funcRecord, variableMapping, stat, i;
+function(func, filters)
+    local tempFileName, funcRecord, variableMapping, stat, i;
     
     #determine if function is bound
-    func := ApplicableMethodTypes(operationName, filters);
+    #func := ApplicableMethodTypes(operationName, filters);
 
     tempFileName := "determineMethodOutputHelper.temp";
     JSON_CompileFunc(tempFileName, func, "");
@@ -92,6 +100,8 @@ function(operationName, filters)
         else
             #because this is a top-level return (can't be under some condition!)
             #TODO: handle conditional returns
+            #for conditional returns: find all return statements in the function,
+            #put them in a list, find common type
             return handleStat(stat, variableMapping);
         fi;
     od;
@@ -100,4 +110,6 @@ function(operationName, filters)
     return []; #no return type, has only side effects
 end;
 
-Print(determineMethodOutputType(InvariantBilinearForm,[IsMatrixGroup and HasInvariantQuadraticForm]));
+Print(determineMethodOutputType(IS_PGROUP_FOR_NILPOTENT, [IsObject]));
+
+#Print(determineMethodOutputType(ApplicableMethodTypes(InvariantBilinearForm,[IsMatrixGroup and HasInvariantQuadraticForm]), [IsMatrixGroup and HasInvariantQuadraticForm]));

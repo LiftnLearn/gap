@@ -2568,7 +2568,7 @@ CVar JSON_CompTrueExpr (
 
     /* emit the code                                                       */
     //JSON_Emit( "%c = True;\n", val );
-    JSON_Emit("\"true\"");
+    JSON_Emit("true");
 
     /* we know that the result is boolean ;-)                              */
     JSON_SetInfoCVar( val, W_BOOL );
@@ -2592,7 +2592,7 @@ CVar JSON_CompFalseExpr (
 
     /* emit the code                                                       */
     //JSON_Emit( "%c = False;\n", val );
-    JSON_Emit("\"false\"");
+    JSON_Emit("false");
 
     /* we know that the result is boolean ;-)                              */
     JSON_SetInfoCVar( val, W_BOOL );
