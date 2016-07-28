@@ -24,3 +24,5 @@ function()
        JSON_CompileFunc(dest, func, "");
     od;
 end;
+
+determineMethodOutputType := function() ; end;

@@ -3153,7 +3153,7 @@ CVar JSON_CompIsbLVar (
     /* get the local variable                                              */
     lvar = (LVar)(ADDR_EXPR(expr)[0]);
 
-    JSON_Emit("{\"type\":\"variable\", \"subtype\":\"isBoundLVar\"");
+    JSON_Emit("{\"type\":\"isBound\", \"subtype\":\"LVar\"");
     JSON_Emit(", \"identifier\":\"%s\"}", NAME_LVAR(lvar));
 
     /* allocate a new temporary for the result                             */
@@ -3231,7 +3231,7 @@ CVar JSON_CompIsbHVar (
     /* free the temporaries                                                */
     if ( IS_TEMP_CVAR( val ) )  JSON_FreeTemp( TEMP_CVAR( val ) );
 
-    JSON_Emit("{\"type\":\"variable\", \"subtype\":\"isBoundHVar\"");
+    JSON_Emit("{\"type\":\"isBound\", \"subtype\":\"HVar\"");
     JSON_Emit(", \"identifier\":\"%s\"}", NAME_HVAR(hvar));
 
     /* return the result                                                   */
@@ -3311,7 +3311,7 @@ CVar JSON_CompIsbGVar (
     gvar = (GVar)(ADDR_EXPR(expr)[0]);
     JSON_CompSetUseGVar( gvar, COMP_USE_GVAR_COPY );
 
-    JSON_Emit("{\"type\":\"variable\", \"subtype\":\"isBoundGVar\"");
+    JSON_Emit("{\"type\":\"isBound\", \"subtype\":\"GVar\"");
     JSON_Emit( ", \"identifier\":\"%s\"}", NameGVar(gvar));
 
     /* allocate new temporaries for the value and the result               */

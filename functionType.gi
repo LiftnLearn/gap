@@ -2,8 +2,31 @@ Read("functionType.gd");
 
 handleExpr :=
 function(expr, variableMapping)
+    local argTypes, arg;
     Print(expr, "\n --------------------- \n");
-    if(IsBound(expr.type)) then
+    if(IsBound(expr.type) and expr.type = "functionCall" 
+    and IsBound(expr.name)) then
+        if(IsBoundGlobal(Concatenation("MitM_", expr.name.identifier))) then
+            #function containing objectify -> get output filter
+        else
+            #analyze return type of called function
+            argTypes := [];
+
+            for arg in expr.args do
+                argTypes.add(handleExpr(arg));
+            od;
+            
+            return determineMethodOutputType(expr.name, argTypes);
+        fi;
+    elif(IsBound(expr.type) and expr.type = "variable") then
+        #simple variable lookup 
+        if(expr.subtype = "LVar") then 
+            return variableMapping.(expr.identifier);
+        elif(expr.subtype = "GVar") then
+            #how to handle this
+            return [IsObject];
+        fi;
+    elif(IsBound(expr.type)) then
         return [expr.type];
     else
         return [IsObject];
@@ -17,9 +40,10 @@ function(stat, variableMapping)
 
     Print(stat, "\n --------------------- \n");
 
-    if(IsBound(stat.stat.type) and stat.stat.type = "functionCall"
+    if(IsBound(stat.stat.type) and stat.stat.type = "functionCall" 
       and IsBound(stat.stat.name) and IsBoundGlobal(
       Concatenation("MitM_", stat.stat.name.identifier))) then
+         #this would actually be a procedure call, but shouldn't matter
          ;#TODO: function containing objectify -> get output filter
     elif(IsBound(stat.stat.type) and stat.stat.type = "assign") then
         variableMapping.(stat.stat.left) :=
