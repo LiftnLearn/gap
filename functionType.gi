@@ -6,9 +6,9 @@ function(expr, variableMapping)
     Print(expr, "\n --------------------- \n");
 
     if(IsList(expr)) then
-        return [IsList];
+        return IsList;
     elif(IsBool(expr) or (IsBound(expr.type) and expr.type = "BoolExpr")) then
-        return [IsBool];
+        return IsBool;
     elif(IsBound(expr.type) and expr.type = "functionCall" 
     and IsBound(expr.name)) then
         if(IsBoundGlobal(Concatenation("MitM_", expr.name.identifier))) then
@@ -33,14 +33,13 @@ function(expr, variableMapping)
             return NamesFilter(TRUES_FLAGS(TypeObj(expr.name.identifier)![2]));
         fi;
     else
-        return [IsObject];
+        return IsObject;
     fi;
 end;
 
 handleStat :=
 function(stat, variableMapping)
     local type;
-    type := [IsObject];
 
     Print(stat, "\n --------------------- \n");
 
@@ -58,16 +57,15 @@ function(stat, variableMapping)
         ;
     elif(IsBound(stat.stat.type) and stat.stat.type = "return") then
         if(stat.stat.void) then
-            type := [];
+            Append(variableMapping.returns, [[]]);
         else
-            type := handleExpr(stat.stat.("return"), variableMapping);
+            Append(variableMapping.returns,
+                [handleExpr(stat.stat.("return"), variableMapping)]);
         fi;
     else #cases that are not taken care of
         Print("unknown type \n");
         #Print(stat);
     fi;
-
-    return type;    
 end;
 
 #for every assignment add value to set
@@ -86,7 +84,8 @@ function(func, filters)
     funcRecord := JsonStringToGap(IO_ReadUntilEOF(IO_File(tempFileName)));
 
     #add all parameters with their types to the variableMapping
-    variableMapping := rec();
+    #returns is a list of all possible return types
+    variableMapping := rec( returns := [] );
 
     i := 1;
     while i <= Length(funcRecord.param) do
@@ -95,19 +94,21 @@ function(func, filters)
     od;
 
     for stat in funcRecord.body.stat do
-        if(not (IsBound(stat.stat.type) and stat.stat.type = "return")) then
-            handleStat(stat, variableMapping);
-        else
-            #because this is a top-level return (can't be under some condition!)
-            #TODO: handle conditional returns
-            #for conditional returns: find all return statements in the function,
-            #put them in a list, find common type
-            return handleStat(stat, variableMapping);
-        fi;
+        handleStat(stat, variableMapping);
     od;
    
-    #I don't think this should ever happen ?
-    return []; #no return type, has only side effects
+    #TODO: possibly return intersection of most basic common filter
+    if(Length(variableMapping.returns) > 0) then
+        temp := variableMapping.returns[1];
+        for i in variableMapping.returns do
+            if(not(temp = i)) then
+                variableMapping.returns := IsObject;
+                break;
+            fi;
+        od;
+        variableMapping.returns := temp;
+    fi;
+    return variableMapping.returns;
 end;
 
 Print(determineMethodOutputType(IS_PGROUP_FOR_NILPOTENT, [IsObject]));
