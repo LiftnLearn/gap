@@ -3,34 +3,42 @@ Read("functionType.gd");
 handleExpr :=
 function(expr, variableMapping)
     local argTypes, arg;
-    Print(expr, "\n --------------------- \n");
+#    Print(expr, "\n --------------------- \n");
 
     if(IsList(expr)) then
+        #shouldn't I figure out what kind of list this is ?
         return IsList;
     elif(IsBool(expr) or (IsBound(expr.type) and expr.type = "BoolExpr")) then
         return IsBool;
     elif(IsBound(expr.type) and expr.type = "functionCall" 
     and IsBound(expr.name)) then
         if(IsBoundGlobal(Concatenation("MitM_", expr.name.identifier))) then
-            #function containing objectify -> get output filter
+#TODO:            #function containing objectify -> get output filter
+            return IsObject;
+        elif(IsKernelFunction(ValueGlobal(expr.name.identifier))) then
+            return IsObject; #maybe hardcode some classic ones, i.e. length?
         else
             #analyze return type of called function
             argTypes := [];
 
             for arg in expr.args do
-                argTypes.add(handleExpr(arg));
+                Append(argTypes, [handleExpr(arg, variableMapping)]);
             od;
             
-            return determineMethodOutputType(expr.name, argTypes);
+            return determineMethodOutputType(expr.name.identifier, argTypes);
         fi;
     elif(IsBound(expr.type) and expr.type = "variable") then
         #simple variable lookup 
-        if(expr.subtype = "LVar") then 
+        if(expr.subtype = "LVar" or expr.subtype = "RefLVar") then 
             return variableMapping.(expr.identifier);
-        elif(expr.subtype = "GVar") then
+        elif(expr.subtype = "GVar" or expr.subtype = "RefGVar") then
             #TODO: this gives redundant filters, is there some way to give only
             #basic ones? -> unwrap from back until whole list found
             return NamesFilter(TRUES_FLAGS(TypeObj(expr.name.identifier)![2]));
+        else
+            #TODO
+            Print("unknown variable lookup\n");
+            return IsObject;
         fi;
     else
         return IsObject;
@@ -39,9 +47,8 @@ end;
 
 handleStat :=
 function(stat, variableMapping)
-    local type;
-
-    Print(stat, "\n --------------------- \n");
+    local s;
+#    Print(stat, "\n --------------------- \n");
 
     if(IsBound(stat.stat.type) and stat.stat.type = "functionCall" 
       and IsBound(stat.stat.name) and IsBoundGlobal(
@@ -62,9 +69,18 @@ function(stat, variableMapping)
             Append(variableMapping.returns,
                 [handleExpr(stat.stat.("return"), variableMapping)]);
         fi;
+    elif(IsBound(stat.stat.type) and stat.stat.type = "for") then
+        #TODO: possibly consider whats actually in the list
+        variableMapping.(stat.stat.var) := IsObject;        
+        for s in stat.stat.("do") do
+            handleStat(s, variableMapping);
+        od;
+    elif(IsBound(stat.stat.type) and stat.stat.type = "if") then
+        #all variable assignments in here must be aggregated and checked for matching types
+        ;
     else #cases that are not taken care of
         Print("unknown type \n");
-        #Print(stat);
+        Print(stat);
     fi;
 end;
 
@@ -73,10 +89,12 @@ end;
 #for every operation call recursively apply this
 determineMethodOutputType :=
 function(func, filters)
-    local tempFileName, funcRecord, variableMapping, stat, i;
+    local tempFileName, funcRecord, variableMapping, stat, i, temp;
     
     #determine if function is bound
     #func := ApplicableMethodTypes(operationName, filters);
+
+#    Print("determineMethodOutputType", func, "\n", filters, "\n");
 
     tempFileName := "determineMethodOutputHelper.temp";
     JSON_CompileFunc(tempFileName, func, "");
@@ -108,6 +126,10 @@ function(func, filters)
         od;
         variableMapping.returns := temp;
     fi;
+
+    #empty list ([]) means no return type detected
+    #possibly : anything wrapped in a list means it's a list of that type
+    #   i.e. [IsInt] for a list of integers
     return variableMapping.returns;
 end;
 
