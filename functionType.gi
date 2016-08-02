@@ -10,10 +10,10 @@ function(expr, variableMapping)
         return IsList;
     elif(IsBool(expr) or (IsBound(expr.type) and expr.type = "BoolExpr")) then
         return IsBool;
-    elif(IsBound(expr.type) and expr.type = "functionCall" 
-    and IsBound(expr.name)) then
+    elif(IsBound(expr.type) and expr.type = "functionCall" and
+    IsBound(expr.name)) then
         if(IsBoundGlobal(Concatenation("MitM_", expr.name.identifier))) then
-#TODO:            #function containing objectify -> get output filter
+            #TODO: function containing objectify -> get output filter
             return IsObject;
         elif(IsKernelFunction(ValueGlobal(expr.name.identifier))) then
             return IsObject; #maybe hardcode some classic ones, i.e. length?
@@ -47,10 +47,14 @@ end;
 
 handleStat :=
 function(stat, variableMapping)
-    local s;
+    local s, recNames, recName, variableMappingForIf, variableMappingForElse;
 #    Print(stat, "\n --------------------- \n");
 
-    if(IsBound(stat.stat.type) and stat.stat.type = "functionCall" 
+    if(IsList(stat.stat)) then #sequence of statements
+        for s in stat.stat do
+            handleStat(s, variableMapping);
+        od;
+    elif(IsBound(stat.stat.type) and stat.stat.type = "functionCall" 
       and IsBound(stat.stat.name) and IsBoundGlobal(
       Concatenation("MitM_", stat.stat.name.identifier))) then
          #this would actually be a procedure call, but shouldn't matter
@@ -66,6 +70,7 @@ function(stat, variableMapping)
         if(stat.stat.void) then
             Append(variableMapping.returns, [[]]);
         else
+            if(not(IsMutable(variableMapping.returns))) then Error("List not mutable"); fi;
             Append(variableMapping.returns,
                 [handleExpr(stat.stat.("return"), variableMapping)]);
         fi;
@@ -76,8 +81,38 @@ function(stat, variableMapping)
             handleStat(s, variableMapping);
         od;
     elif(IsBound(stat.stat.type) and stat.stat.type = "if") then
-        #all variable assignments in here must be aggregated and checked for matching types
-        ;
+        #all variable assignments in here must be aggregated and then be
+        #checked for matching types
+        #do a structural copy
+        
+        variableMappingForIf := StructuralCopy(variableMapping);
+        variableMappingForElse := StructuralCopy(variableMapping);
+
+        handleStat(stat.stat.("then"), variableMappingForIf);
+        if(IsBound(stat.stat.("else"))) then
+            handleStat(stat.stat.("else"), variableMappingForElse);
+        fi;
+
+        recNames := ShallowCopy(RecNames(variableMappingForIf));
+        Append(recNames, RecNames(variableMappingForElse));
+
+        recNames := DuplicateFreeList(recNames);    
+        for recName in recNames do
+            if(recName = "returns") then
+                continue;
+            elif(not(IsBound(variableMappingForIf.(recName)))) then
+                variableMapping.(recName) := variableMappingForElse.(recName);
+            elif(not(IsBound(variableMappingForElse.(recName)))) then
+                variableMapping.(recName) := variableMappingForIf.(recName);
+            else
+                if(variableMappingForIf.(recName) =
+                variableMappingForElse.(recName)) then
+                    variableMapping.(recName) := variableMappingForIf.(recName);
+                else
+                    variableMapping.(recName) := IsObject;
+                fi;
+            fi;
+        od;
     else #cases that are not taken care of
         Print("unknown type \n");
         Print(stat);
@@ -111,9 +146,7 @@ function(func, filters)
         i := i + 1;
     od;
 
-    for stat in funcRecord.body.stat do
-        handleStat(stat, variableMapping);
-    od;
+    handleStat(funcRecord.body, variableMapping);
    
     #TODO: possibly return intersection of most basic common filter
     if(Length(variableMapping.returns) > 0) then

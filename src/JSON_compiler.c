@@ -4278,7 +4278,9 @@ void JSON_CompIf (
         if ( i == nr && TNUM_EXPR(ADDR_STAT(stat)[2*(i-1)]) == T_TRUE_EXPR )
             break;
 
-        JSON_Emit( ",\"else\":{\"type\":\"if\", \"cond\":" );
+        JSON_Emit( ",\"else\":");
+        JSON_Emit("{ \"type\":\"debugInfo\", \"line\":%d, \"stat\":", LINE_STAT(stat));
+        JSON_Emit("{\"type\":\"if\", \"cond\":"); 
     //    JSON_Emit("open");
 
         /* emit the 'else' to connect this branch to the 'if' branch       */
@@ -4343,7 +4345,7 @@ void JSON_CompIf (
     for ( i = 2; i <= nr; i++ ) {
         if ( i == nr && TNUM_EXPR(ADDR_STAT(stat)[2*(i-1)]) == T_TRUE_EXPR )
             break;
-        JSON_Emit( "}" );
+        JSON_Emit( "}}" );
    //     JSON_Emit("close");
     }
     
