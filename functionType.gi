@@ -148,6 +148,7 @@ function(func, filters)
 
     handleStat(funcRecord.body, variableMapping);
    
+    #TODO: ignore cases in which fail is returned
     #TODO: possibly return intersection of most basic common filter
     if(Length(variableMapping.returns) > 0) then
         temp := variableMapping.returns[1];
