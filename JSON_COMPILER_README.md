@@ -50,8 +50,9 @@ then call itself. This also applies if the recursion is just indirect.
 
 ##How to use
 The JSON compiler can be used by passing a file name and function
-to be compiled to the "JSON_CompileFunc"-function. The third argument is
-in most cases irrelevant.
+to be compiled to the "JSON_CompileFunc"-function. The third argument has no
+function, but has to be a string and is there for conforming with the signature
+of the original CompileFunc for C code.
 
     JSON_CompileFunc(tempFileName, func, "");
 

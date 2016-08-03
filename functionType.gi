@@ -4,6 +4,7 @@ handleExpr :=
 function(expr, variableMapping)
     local argTypes, arg;
 #    Print(expr, "\n --------------------- \n");
+#    Print("handling expr\n");
 
     if(IsList(expr)) then
         #shouldn't I figure out what kind of list this is ?
@@ -54,6 +55,7 @@ handleStat :=
 function(stat, variableMapping)
     local s, recNames, recName, variableMappingForIf, variableMappingForElse;
 #    Print(stat, "\n --------------------- \n");
+#    Print("handling stat\n");
 
     if(IsList(stat.stat)) then #sequence of statements
         for s in stat.stat do
@@ -129,9 +131,13 @@ end;
 determineMethodOutputType :=
 function(func, filters)
     local tempFileName, funcRecord, variableMapping, stat, i, temp;
+    #Print("determining output type\n");
     
-    #determine if function is bound
-    #func := ApplicableMethodTypes(operationName, filters);
+    if(IsOperation(func)) then
+        func := ApplicableMethodTypes(func, filters);
+    else
+        func := ValueGlobal(func);
+    fi;
 
 #    Print("determineMethodOutputType", func, "\n", filters, "\n");
 
@@ -153,7 +159,7 @@ function(func, filters)
     handleStat(funcRecord.body, variableMapping);
    
     if(Length(variableMapping.returns) > 0) then
-        Print(variableMapping.returns);
+        Print(variableMapping.returns, "\n");
         variableMapping.returns := findBasicFilters(variableMapping.returns);        
     fi;
 
@@ -163,6 +169,6 @@ function(func, filters)
     return variableMapping.returns;
 end;
 
-Print(determineMethodOutputType(IS_PGROUP_FOR_NILPOTENT, [IsObject]));
+#Print(determineMethodOutputType(IS_PGROUP_FROM_SIZE, [IsObject]));
 
-#Print(determineMethodOutputType(ApplicableMethodTypes(InvariantBilinearForm,[IsMatrixGroup and HasInvariantQuadraticForm]), [IsMatrixGroup and HasInvariantQuadraticForm]));
+Print(determineMethodOutputType(IsPGroup, [IsGroup and IsNilpotentGroup]));
