@@ -41,7 +41,9 @@ function(filters)
     filterIDs := [];
     #find implied filters, take intersection, build up to biggest common filter (and combine with and)
     for filter in filters do
-        Add(filterIDs, getFilterList(filter));
+        if(not(filter = fail)) then
+            Add(filterIDs, getFilterList(filter));
+        fi;
     od;
 
     uniqueFilterIDs := Intersection(filterIDs);

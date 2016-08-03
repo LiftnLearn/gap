@@ -19,9 +19,11 @@ function(expr, variableMapping)
         elif(KnowsDictionary(RETURN_TYPE_DICT, expr.name.identifier)) then
             return LookupDictionary(RETURN_TYPE_DICT, expr.name.identifier);
         elif(IsKernelFunction(ValueGlobal(expr.name.identifier))) then
-            return IsObject; #maybe hardcode some classic ones, i.e. length?
+            return IsObject;
         else
             #analyze return type of called function
+            #BUG: this will lead to infinite mutual recursion if any recursive
+            #function is analyzed
             argTypes := [];
 
             for arg in expr.args do
@@ -89,7 +91,8 @@ function(stat, variableMapping)
         #do a structural copy
         
         variableMappingForIf := StructuralCopy(variableMapping);
-        variableMappingForElse := StructuralCopy(variableMapping);
+        variableMappingForIf.returns := [];
+        variableMappingForElse := StructuralCopy(variableMappingForIf);
 
         handleStat(stat.stat.("then"), variableMappingForIf);
         if(IsBound(stat.stat.("else"))) then
@@ -102,18 +105,16 @@ function(stat, variableMapping)
         recNames := DuplicateFreeList(recNames);    
         for recName in recNames do
             if(recName = "returns") then
-                continue;
+                Append(variableMapping.returns, variableMappingForIf.returns);
+                Append(variableMapping.returns, variableMappingForElse.returns);
             elif(not(IsBound(variableMappingForIf.(recName)))) then
                 variableMapping.(recName) := variableMappingForElse.(recName);
             elif(not(IsBound(variableMappingForElse.(recName)))) then
                 variableMapping.(recName) := variableMappingForIf.(recName);
             else
-                if(variableMappingForIf.(recName) =
-                variableMappingForElse.(recName)) then
-                    variableMapping.(recName) := variableMappingForIf.(recName);
-                else
-                    variableMapping.(recName) := IsObject;
-                fi;
+                variableMapping.(recName) :=
+                    findBasicFilters([variableMappingForIf.(recName),
+                    variableMappingForElse.(recName)]);
             fi;
         od;
     else #cases that are not taken care of
@@ -151,21 +152,13 @@ function(func, filters)
 
     handleStat(funcRecord.body, variableMapping);
    
-    #TODO: ignore cases in which fail is returned
-    #TODO: possibly return intersection of most basic common filter
     if(Length(variableMapping.returns) > 0) then
-        temp := variableMapping.returns[1];
-        for i in variableMapping.returns do
-            if(not(temp = i)) then
-                variableMapping.returns := IsObject;
-                break;
-            fi;
-        od;
-        variableMapping.returns := temp;
+        Print(variableMapping.returns);
+        variableMapping.returns := findBasicFilters(variableMapping.returns);        
     fi;
 
     #empty list ([]) means no return type detected
-    #possibly : anything wrapped in a list means it's a list of that type
+    #possible feature: anything wrapped in a list means it's a list of that type
     #   i.e. [IsInt] for a list of integers
     return variableMapping.returns;
 end;
