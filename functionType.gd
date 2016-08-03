@@ -32,6 +32,7 @@ end;
 
 #convenience function that takes a list of filters and returns the minimum set
 #of filters for a given set of filterIDs
+#test case: IsCollection and IsGroup -> both fulfill IsCollection
 findBasicFilters :=
 function(filters)
     local el, i, filter, filterIDs, uniqueFilterIDs, resultFilterIDList,
@@ -74,6 +75,12 @@ function(filters)
     return ans;
 end;
 
-#test case: IsCollection and IsGroup -> both fulfill IsCollection
+#hardcode return types of certain functions
+if(not(IsBound(RETURN_TYPE_DICT))) then
+    BIND_GLOBAL("RETURN_TYPE_DICT", NewDictionary("some string", true));
+
+    AddDictionary(RETURN_TYPE_DICT, "Length", IsInt);
+    AddDictionary(RETURN_TYPE_DICT, "Size", IsInt);
+fi;
 
 determineMethodOutputType := function() ; end;

@@ -14,7 +14,10 @@ function(expr, variableMapping)
     IsBound(expr.name)) then
         if(IsBoundGlobal(Concatenation("MitM_", expr.name.identifier))) then
             #TODO: function containing objectify -> get output filter
+            #ideally from some lookup
             return IsObject;
+        elif(KnowsDictionary(RETURN_TYPE_DICT, expr.name.identifier)) then
+            return LookupDictionary(RETURN_TYPE_DICT, expr.name.identifier);
         elif(IsKernelFunction(ValueGlobal(expr.name.identifier))) then
             return IsObject; #maybe hardcode some classic ones, i.e. length?
         else
