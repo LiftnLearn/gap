@@ -62,4 +62,12 @@ compiled and the filters of the arguments being passed.
 
     Read("functionType.gi");
 
-    determineMethodOutputType(IS_PGROUP_FOR_NILPOTENT, [IsObject]);
+    determineMethodOutputType("IS_PGROUP_FOR_NILPOTENT", [IsObject]);
+
+## Examples
+
+    determineMethodOutputType("IS_PGROUP_FROM_SIZE", [IsObject])) -> IsBool
+
+    #example of speculative method, there is an implicit void-return at
+    #the end of the function
+    determineMethodOutputType("IsPGroup", [IsGroup and IsNilpotentGroup]);

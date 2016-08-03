@@ -1,5 +1,8 @@
 Read("functionType.gd");
 
+#keeps track of all called functions to find recursion
+calledFunctions := [];
+
 handleExpr :=
 function(expr, variableMapping)
     local argTypes, arg;
@@ -43,10 +46,13 @@ function(expr, variableMapping)
             return NamesFilter(TRUES_FLAGS(TypeObj(expr.name.identifier)![2]));
         else
             #TODO
-            Print("unknown variable lookup\n");
+            Print("Unknown variable lookup: ", expr, "\n");
             return IsObject;
         fi;
+    elif(IsBound(expr.type) and expr.type = "listAccess") then
+        return IsObject;
     else
+        Print("Unknown expression: ", expr, "\n");
         return IsObject;
     fi;
 end;
@@ -57,13 +63,15 @@ function(stat, variableMapping)
 #    Print(stat, "\n --------------------- \n");
 #    Print("handling stat\n");
 
+    #TODO: make this look nice, get rid of repeated IsBounds
+
     if(IsList(stat.stat)) then #sequence of statements
         for s in stat.stat do
             handleStat(s, variableMapping);
         od;
     elif(IsBound(stat.stat.type) and stat.stat.type = "functionCall" 
-      and IsBound(stat.stat.name) and IsBoundGlobal(
-      Concatenation("MitM_", stat.stat.name.identifier))) then
+    and IsBound(stat.stat.name) and IsBoundGlobal(
+    Concatenation("MitM_", stat.stat.name.identifier))) then
          #this would actually be a procedure call, but shouldn't matter
          ;#TODO: function containing objectify -> get output filter
     elif(IsBound(stat.stat.type) and stat.stat.type = "assign") then
@@ -72,18 +80,22 @@ function(stat, variableMapping)
               handleExpr(stat.stat.right, variableMapping);
         fi;
     elif(IsBound(stat.stat.type) and stat.stat.type = "functionCall") then
-        ;
+        #only of relevance if function has side effects
+        #TODO: possibly infer that the left type in "Add" is always a list,
+        #and for Append the left and right ones are lists
+        return;
+    elif(IsBound(stat.stat.type) and stat.stat.type = "Info") then
+        return;
     elif(IsBound(stat.stat.type) and stat.stat.type = "return") then
         if(stat.stat.void) then
             Append(variableMapping.returns, [[]]);
         else
-            if(not(IsMutable(variableMapping.returns))) then Error("List not mutable"); fi;
             Append(variableMapping.returns,
                 [handleExpr(stat.stat.("return"), variableMapping)]);
         fi;
-    elif(IsBound(stat.stat.type) and stat.stat.type = "for") then
+    elif(IsBound(stat.stat.type) and (stat.stat.type in ["for", "while"])) then
         #TODO: possibly consider whats actually in the list
-        variableMapping.(stat.stat.var) := IsObject;        
+        if(stat.stat.type = "for") then variableMapping.(stat.stat.var):=IsObject; fi; 
         for s in stat.stat.("do") do
             handleStat(s, variableMapping);
         od;
@@ -105,6 +117,7 @@ function(stat, variableMapping)
         Append(recNames, RecNames(variableMappingForElse));
 
         recNames := DuplicateFreeList(recNames);    
+        #TODO: can this be simplified
         for recName in recNames do
             if(recName = "returns") then
                 Append(variableMapping.returns, variableMappingForIf.returns);
@@ -129,14 +142,22 @@ end;
 #go over each line of the compiled function,
 #for every operation call recursively apply this
 determineMethodOutputType :=
-function(func, filters)
-    local tempFileName, funcRecord, variableMapping, stat, i, temp;
+function(funcName, filters)
+    local func, tempFileName, funcRecord, variableMapping, stat, i, temp;
     #Print("determining output type\n");
-    
-    if(IsOperation(func)) then
-        func := ApplicableMethodTypes(func, filters);
+    func := false;
+
+    if(funcName in calledFunctions) then
+        Error("Recursion detected");
     else
-        func := ValueGlobal(func);
+#        Print(funcName, " ", calledFunctions, "\n");
+        Add(calledFunctions, funcName);
+    fi;
+    
+    if(IsOperation(ValueGlobal(funcName))) then
+        func := ApplicableMethodTypes(ValueGlobal(funcName), filters);
+    else
+        func := ValueGlobal(funcName);
     fi;
 
 #    Print("determineMethodOutputType", func, "\n", filters, "\n");
@@ -157,6 +178,8 @@ function(func, filters)
     od;
 
     handleStat(funcRecord.body, variableMapping);
+
+    Remove(calledFunctions);
    
     if(Length(variableMapping.returns) > 0) then
         Print(variableMapping.returns, "\n");
@@ -169,6 +192,6 @@ function(func, filters)
     return variableMapping.returns;
 end;
 
-#Print(determineMethodOutputType(IS_PGROUP_FROM_SIZE, [IsObject]));
-
-Print(determineMethodOutputType(IsPGroup, [IsGroup and IsNilpotentGroup]));
+#Print(determineMethodOutputType("IS_PGROUP_FROM_SIZE", [IsObject]));
+Print(determineMethodOutputType("IsPGroup", [IsGroup and IsNilpotentGroup]));
+#Print(determineMethodOutputType(GrowthFunctionOfGroup, [IsGroup and HasGeneratorsOfGroup,IsPosInt]));

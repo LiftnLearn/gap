@@ -1,7 +1,8 @@
 LoadPackage("MitM", false);
 
 #determineFunctionType
-#returns most general answer that will always hold, as otherwise you could just run it with it?
+#returns most general answer that will always hold, as otherwise you
+#could just run it with it?
 
 compileJSON := 
 function()
@@ -33,6 +34,9 @@ end;
 #convenience function that takes a list of filters and returns the minimum set
 #of filters for a given set of filterIDs
 #test case: IsCollection and IsGroup -> both fulfill IsCollection
+#bug: this assumes that filters only are created of lower ranked filters,
+#this seems however not to be always the case (i.e. filter 15, IsList, implies
+#filter 56, IsListOrCollection
 findBasicFilters :=
 function(filters)
     local el, i, filter, filterIDs, uniqueFilterIDs, resultFilterIDList,
@@ -42,7 +46,7 @@ function(filters)
     #find implied filters, take intersection, build up to biggest common filter (and combine with and)
     for filter in filters do
         if(filter = []) then
-            return []; #function might or might not return
+            continue; #function might or might not return, we speculate
         elif(not(filter = fail)) then
             Add(filterIDs, getFilterList(filter));
         fi;
