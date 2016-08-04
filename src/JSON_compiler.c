@@ -15,10 +15,10 @@
 #include        <stdio.h>               /* Input/Output for debugging      */
 #include        <stdlib.h> 
 #include        <ctype.h>
-
+#include        <errno.h>
 #include        <stdarg.h>              /* variable argument list macros   */
-#include        "system.h"              /* Ints, UInts                     */
 
+#include        "system.h"              /* Ints, UInts                     */
 
 #include        "gasman.h"              /* garbage collector               */
 #include        "objects.h"             /* objects                         */
@@ -5839,7 +5839,8 @@ Int JSON_CompileFunc (
     json = fopen(output, "w");
 
     if(!json) {
-      printf("JSON file couldn't be openend.");
+      printf("JSON file couldn't be openend.\n");
+      printf("ERROR: %s\n", strerror(errno));
       exit(EXIT_FAILURE);
     }
 
@@ -5868,11 +5869,12 @@ Int JSON_CompileFunc (
     /* now compile the handlers                                            */
     JSON_CompFunc( func );
 
+    fclose(json);
+
     /* close the output file                                               */
     SyNrCols = col;
     CloseOutput();
 
-    fclose(json);
     
     /* return success                                                      */
     return JSON_CompFunctionsNr;

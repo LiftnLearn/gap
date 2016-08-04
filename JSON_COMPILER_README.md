@@ -48,6 +48,9 @@ No bugs are currently known for the compiler.
 The type inference does not work on recursive functions as the analyser would
 then call itself. This also applies if the recursion is just indirect.
 
+The runOverAllOperations-function currently crashes if it is called more than
+one time per GAP-session.
+
 ##How to use
 The JSON compiler can be used by passing a file name and function
 to be compiled to the "JSON_CompileFunc"-function. The third argument has no
@@ -58,16 +61,21 @@ of the original CompileFunc for C code.
 
 The output type of function can be determined using the functionType-files.
 The function 'determineMethodOutputType' expects a function to be
-compiled and the filters of the arguments being passed.
+compiled and the filters of the arguments being passed. You can also optionally
+as third argument directly pass the code to be analyzed.
 
     Read("functionType.gi");
 
-    determineMethodOutputType("IS_PGROUP_FOR_NILPOTENT", [IsObject]);
+    determineMethodOutputType("IS_PGROUP_FOR_NILPOTENT", [IsObject], false);
+
+To write statistics into the file statistics.txt in the gap-directory just do:
+
+    runOverAllOperations();
 
 ## Examples
 
-    determineMethodOutputType("IS_PGROUP_FROM_SIZE", [IsObject])) -> IsBool
+    determineMethodOutputType("IS_PGROUP_FROM_SIZE", [IsObject], false) -> IsBool
 
     #example of speculative method, there is an implicit void-return at
     #the end of the function
-    determineMethodOutputType("IsPGroup", [IsGroup and IsNilpotentGroup]);
+    determineMethodOutputType("IsPGroup", [IsGroup and IsNilpotentGroup], false);

@@ -98,27 +98,46 @@ if(not(IsBound(RETURN_TYPE_DICT))) then
     AddDictionary(RETURN_TYPE_DICT, "Size", IsInt);
 fi;
 
+statisticsFile := "statistics.txt";
+
+#hints at possible areas of improvement in analyzer
+problemList := [];
+allProblemList := [];
+allProblemCountList := [];
+
 LackOfData :=
 function(msg)
-    AppendTo("statistics.csv", msg, "\n");
+    local pos;
+
+    Add(problemList, msg);
+
+    pos := Position(allProblemList, msg);
+    
+    if(pos = fail) then
+        Add(allProblemList, msg);
+        Add(allProblemCountList, 0);
+    else
+        allProblemCountList[pos] := allProblemCountList[pos] + 1;
+    fi;
 end;
 
+#bug: seems to crash if it is called more than once per session
 runOverAllOperations :=
 function()
-    local i, j, a, f, operation, methodsForOp, methods, mpos, mres, mmpos, combineWithAnd, l;
+    local i, j, a, l, operation, methods, mpos, mres, filter, isObjectCount, overallCount;
+
+    isObjectCount := 0;
+    overallCount := 0;
+
+    allProblemList := [];
+    allProblemCountList := [];
 
     #clear file
-    PrintTo("statistics.csv", "");
+    PrintTo(statisticsFile, "");
 
     for i in [1..Length(OPERATIONS)/2] do
         operation := rec();
         operation.name := NameFunction(OPERATIONS[2*i - 1]);
-        
-#        methodsForOp := Filtered(METHOD_LOCATIONS, x->x[1] = OPERATIONS[2 * i - 1]);
-
-        operation.methods := rec( 0args := [], 1args := [], 2args := [],
-                                  3args := [], 4args := [], 5args := [],
-                                  6args := []);        
 
         for a in [1..6] do
             methods := METHODS_OPERATION(OPERATIONS[2*i - 1], a);
@@ -127,29 +146,39 @@ function()
                 mpos := (j-1) * (a + 4) + 1;
                 mres := rec( filters := List([1..a],
                                 argnum ->
-                                        List(TRUES_FLAGS(methods[mpos + argnum]), x-> FILTERS[x])
+                                        List(TRUES_FLAGS(methods[mpos + argnum]),
+                                                         x-> FILTERS[x])
                                         ),
                             rank := methods[mpos + a + 2],
                             comment := methods[mpos + a + 3]
                         );
 
-                Print(mpos+a+1);
-                determineMethodOutputType(operation.name, List(mres.filters, l -> findBasicFilters(l)), methods[mpos+a+1]);
+                #hints at possible areas of improvement in analyzer
+                problemList := [];
 
+                filter := determineMethodOutputType(operation.name,
+                    List(mres.filters, l -> findBasicFilters(l)),
+                    methods[mpos+a+1]);
 
-#            mmpos := PositionProperty(methodsForOp, x -> x[2] = methods[mpos + a + 1]);
-#            if mmpos <> fail then
-#                mres.location := methodsForOp[mmpos][6];
-#            else
-#                Print("Warning: Could not find location of method installation: ", NameFunction(OPERATION[2*i - 1]));
-#            fi;
+                overallCount := overallCount + 1;
 
-            Add(operation.methods.(Concatenation(String(a), "args")), mres);
-            
+                if(filter = IsObject) then
+                    AppendTo(statisticsFile, operation.name, ": ", String(problemList), "\n");
+                    isObjectCount := isObjectCount + 1;
+                fi;
             od;
-#            Print(methods, "\n");
         od;
-#        Print(operation, "\n");
+    od;
+
+    AppendTo(statisticsFile, "---------------------\n",
+                            "Summary of statistics:\n",
+                            "Overall functions analyzed: ", overallCount, "\n",
+                            "Found IsObject as result: ", isObjectCount, "\n",
+                            "\nReasons for IsObject occurences:\n",
+                            "(There might be multiple reasons per function)\n");
+
+    for i in [1..Length(allProblemList)] do
+        AppendTo(statisticsFile, allProblemList[i], ": ", allProblemCountList[i], "\n");
     od;
 end;
 

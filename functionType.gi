@@ -7,7 +7,7 @@ handleExpr :=
 function(expr, variableMapping)
     local argTypes, arg;
 #    Print(expr, "\n --------------------- \n");
-    Print("handling expr\n");
+#    Print("handling expr\n");
 
     if(IsList(expr)) then
         #shouldn't I figure out what kind of list this is ?
@@ -17,7 +17,8 @@ function(expr, variableMapping)
     elif(IsBool(expr) or (IsBound(expr.type) and expr.type = "BoolExpr")) then
         return IsBool;
     elif(IsBound(expr.type) and expr.type = "functionCall" and
-    IsBound(expr.name) and expr.name.subtype = "RefGVar") then
+    IsBound(expr.name) and IsBound(expr.name.subtype) and
+    expr.name.subtype = "RefGVar") then
         if(expr.name.identifier = "Objectify" or
         IsBoundGlobal(Concatenation("MitM_", expr.name.identifier))) then
             #TODO: function containing objectify -> get output filter
@@ -34,7 +35,7 @@ function(expr, variableMapping)
             argTypes := [];
 
             for arg in expr.args do
-                Append(argTypes, [handleExpr(arg, variableMapping)]);
+                Add(argTypes, handleExpr(arg, variableMapping));
             od;
             
             return determineMethodOutputType(expr.name.identifier, argTypes, false);
@@ -69,7 +70,7 @@ handleStat :=
 function(stat, variableMapping)
     local s, recNames, recName, variableMappingForIf, variableMappingForElse;
 #    Print(stat, "\n --------------------- \n");
-    Print("handling stat\n");
+#    Print("handling stat\n");
 
     #TODO: make this look nice, get rid of repeated IsBounds
 
@@ -96,10 +97,10 @@ function(stat, variableMapping)
         return;
     elif(IsBound(stat.stat.type) and stat.stat.type = "return") then
         if(stat.stat.void) then
-            Append(variableMapping.returns, [[]]);
+            Add(variableMapping.returns, []);
         else
-            Append(variableMapping.returns,
-                [handleExpr(stat.stat.("return"), variableMapping)]);
+            Add(variableMapping.returns,
+                handleExpr(stat.stat.("return"), variableMapping));
         fi;
     elif(IsBound(stat.stat.type) and (stat.stat.type in ["for", "while"])) then
         #TODO: possibly consider whats actually in the list
@@ -155,9 +156,10 @@ end;
 #for every operation call recursively apply this
 determineMethodOutputType :=
 function(funcName, filters, code)
-    local func, tempFileName, funcRecord, variableMapping, stat, i, temp;
-    Print("determining output type: ", funcName, " ", filters, " ", code, " ", IsKernelFunction(code), "\n");
+    local f, func, tempFileName, funcRecord, variableMapping, stat, i, temp;
     func := false;
+
+    #TODO: return IsBool if funcName is attribute
  
     if(code <> false and IsKernelFunction(code)) then
         return IsObject;
@@ -181,13 +183,12 @@ function(funcName, filters, code)
         func := code;
     fi;
 
-
-#    Print("determineMethodOutputType", func, "\n", filters, "\n");
-
     tempFileName := "determineMethodOutputHelper.temp";
     JSON_CompileFunc(tempFileName, func, "");
     
-    funcRecord := JsonStringToGap(IO_ReadUntilEOF(IO_File(tempFileName)));
+    f := IO_File(tempFileName);
+    funcRecord := JsonStringToGap(IO_ReadUntilEOF(f));
+    IO_Close(f);
 
     #add all parameters with their types to the variableMapping
     #returns is a list of all possible return types
@@ -213,7 +214,3 @@ function(funcName, filters, code)
     #   i.e. [IsInt] for a list of integers
     return variableMapping.returns;
 end;
-
-#Print(determineMethodOutputType("IS_PGROUP_FROM_SIZE", [IsObject]));
-#Print(determineMethodOutputType("IsPGroup", [IsGroup and IsNilpotentGroup], false));
-#Print(determineMethodOutputType(GrowthFunctionOfGroup, [IsGroup and HasGeneratorsOfGroup,IsPosInt]));
