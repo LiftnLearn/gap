@@ -4,6 +4,8 @@ LoadPackage("MitM", false);
 #returns most general answer that will always hold, as otherwise you
 #could just run it with it?
 
+determineMethodOutputType := function() ; end;
+
 compileJSON := 
 function()
     local dest, file, string, f, gapPath, record, func;
@@ -52,7 +54,12 @@ function(filters)
         fi;
     od;
 
-    uniqueFilterIDs := Intersection(filterIDs);
+    #apply patch that fixes Intersection on empty list
+    if(filterIDs <> []) then
+        uniqueFilterIDs := Intersection(filterIDs);
+    else
+        uniqueFilterIDs := [];
+    fi;
 
     resultFilterIDList := [];
     while (Length(uniqueFilterIDs) >= 1) do
@@ -91,4 +98,58 @@ if(not(IsBound(RETURN_TYPE_DICT))) then
     AddDictionary(RETURN_TYPE_DICT, "Size", IsInt);
 fi;
 
-determineMethodOutputType := function() ; end;
+LackOfData :=
+function(msg)
+    AppendTo("statistics.csv", msg, "\n");
+end;
+
+runOverAllOperations :=
+function()
+    local i, j, a, f, operation, methodsForOp, methods, mpos, mres, mmpos, combineWithAnd, l;
+
+    #clear file
+    PrintTo("statistics.csv", "");
+
+    for i in [1..Length(OPERATIONS)/2] do
+        operation := rec();
+        operation.name := NameFunction(OPERATIONS[2*i - 1]);
+        
+#        methodsForOp := Filtered(METHOD_LOCATIONS, x->x[1] = OPERATIONS[2 * i - 1]);
+
+        operation.methods := rec( 0args := [], 1args := [], 2args := [],
+                                  3args := [], 4args := [], 5args := [],
+                                  6args := []);        
+
+        for a in [1..6] do
+            methods := METHODS_OPERATION(OPERATIONS[2*i - 1], a);
+            
+            for j in [1..Int(Length(methods)/(a+4))] do
+                mpos := (j-1) * (a + 4) + 1;
+                mres := rec( filters := List([1..a],
+                                argnum ->
+                                        List(TRUES_FLAGS(methods[mpos + argnum]), x-> FILTERS[x])
+                                        ),
+                            rank := methods[mpos + a + 2],
+                            comment := methods[mpos + a + 3]
+                        );
+
+                Print(mpos+a+1);
+                determineMethodOutputType(operation.name, List(mres.filters, l -> findBasicFilters(l)), methods[mpos+a+1]);
+
+
+#            mmpos := PositionProperty(methodsForOp, x -> x[2] = methods[mpos + a + 1]);
+#            if mmpos <> fail then
+#                mres.location := methodsForOp[mmpos][6];
+#            else
+#                Print("Warning: Could not find location of method installation: ", NameFunction(OPERATION[2*i - 1]));
+#            fi;
+
+            Add(operation.methods.(Concatenation(String(a), "args")), mres);
+            
+            od;
+#            Print(methods, "\n");
+        od;
+#        Print(operation, "\n");
+    od;
+end;
+
